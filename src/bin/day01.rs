@@ -12,7 +12,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             .filter_map(|line| line.unwrap().parse().ok())
             .collect();
 
-        println!("{}", get_increase_count(&measurements));
+        println!("Window size 1: {}", get_increase_count(&measurements, 1));
+        println!("Window size 3: {}", get_increase_count(&measurements, 3));
 
         Ok(())
     } else {
@@ -20,11 +21,14 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-fn get_increase_count(measurements: &[u32]) -> u32 {
+fn get_increase_count(measurements: &[u32], window_size: usize) -> u32 {
     let mut increases = 0;
 
-    for i in 1..measurements.len() {
-        if measurements[i] > measurements[i - 1] {
+    for i in 1..measurements.len() - (window_size - 1) {
+        let current:u32 = measurements[i..i + window_size].iter().sum();
+        let previous:u32 = measurements[i - 1..i + window_size - 1].iter().sum();
+
+        if current > previous {
             increases += 1;
         }
     }
@@ -39,6 +43,7 @@ mod test {
     #[test]
     fn test_get_increase_count() {
         let depths = [199, 200, 208, 210, 200, 207, 240, 269, 260, 263];
-        assert_eq!(7, get_increase_count(&depths));
+        assert_eq!(7, get_increase_count(&depths, 1));
+        assert_eq!(5, get_increase_count(&depths, 3));
     }
 }

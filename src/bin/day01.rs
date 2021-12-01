@@ -22,18 +22,15 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 fn get_increase_count(measurements: &[u32], window_size: usize) -> u32 {
-    let mut increases = 0;
-
-    for i in 1..measurements.len() - (window_size - 1) {
-        let current:u32 = measurements[i..i + window_size].iter().sum();
-        let previous:u32 = measurements[i - 1..i + window_size - 1].iter().sum();
-
-        if current > previous {
-            increases += 1;
-        }
-    }
-
-    increases
+    // It turns out that we don't actually need to sum the values in the given window; the change
+    // from one position to the next will always be +newValue, -oldValue, and so we can get the same
+    // result (is this an increase or not?) just by compairing the new value coming into the window
+    // with the old value leaving the window.
+    measurements[0..measurements.len() - (window_size - 1)]
+        .iter()
+        .zip(measurements[window_size..measurements.len()].iter())
+        .filter(|(a, b)| b > a)
+        .count() as u32
 }
 
 #[cfg(test)]

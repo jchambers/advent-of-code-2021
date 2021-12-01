@@ -26,9 +26,8 @@ fn get_increase_count(measurements: &[u32], window_size: usize) -> u32 {
     // from one position to the next will always be +newValue, -oldValue, and so we can get the same
     // result (is this an increase or not?) just by compairing the new value coming into the window
     // with the old value leaving the window.
-    measurements[0..measurements.len() - (window_size - 1)]
-        .iter()
-        .zip(measurements[window_size..measurements.len()].iter())
+    measurements[..=measurements.len() - window_size].iter()
+        .zip(measurements[window_size..].iter())
         .filter(|(a, b)| b > a)
         .count() as u32
 }

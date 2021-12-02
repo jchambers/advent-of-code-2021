@@ -1,7 +1,7 @@
 use std::{env, error, io};
 use std::fs::File;
 use std::io::BufRead;
-use crate::Command::{Down, Forward, Up};
+use self::Command::*;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -14,8 +14,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             .collect();
 
         let (horizontal, depth) = get_distance(&commands);
+        println!("With displacement: {} × {} = {}", horizontal, depth, horizontal * depth);
 
-        println!("{} × {} = {}", horizontal, depth, horizontal * depth);
+        let (horizontal, depth) = get_distance_with_aim(&commands);
+        println!("With aim: {} × {} = {}", horizontal, depth, horizontal * depth);
 
         Ok(())
     } else {
@@ -32,6 +34,25 @@ fn get_distance(commands: &[Command]) -> (u32, u32) {
             Forward(h) => horizontal += h,
             Down(d) => depth += d,
             Up(d) => depth -= d
+        };
+    }
+
+    (horizontal, depth)
+}
+
+fn get_distance_with_aim(commands: &[Command]) -> (u32, u32) {
+    let mut horizontal = 0;
+    let mut depth = 0;
+    let mut aim = 0;
+
+    for command in commands {
+        match command {
+            Forward(h) => {
+                horizontal += h;
+                depth += aim * h;
+            },
+            Down(a) => aim += a,
+            Up(a) => aim -= a
         };
     }
 
@@ -72,6 +93,15 @@ impl TryFrom<&str> for Command {
 mod test {
     use super::*;
 
+    static COMMANDS: [Command; 6] = [
+        Forward(5),
+        Down(5),
+        Forward(8),
+        Up(3),
+        Down(8),
+        Forward(2)
+    ];
+
     #[test]
     fn test_command_from_string() {
         assert_eq!(Ok(Forward(1)), Command::try_from("forward 1"));
@@ -82,15 +112,11 @@ mod test {
 
     #[test]
     fn test_get_distance() {
-        let commands = [
-            Forward(5),
-            Down(5),
-            Forward(8),
-            Up(3),
-            Down(8),
-            Forward(2)
-        ];
+        assert_eq!((15, 10), get_distance(&COMMANDS));
+    }
 
-        assert_eq!((15, 10), get_distance(&commands));
+    #[test]
+    fn test_get_distance_with_aim() {
+        assert_eq!((15, 60), get_distance_with_aim(&COMMANDS));
     }
 }

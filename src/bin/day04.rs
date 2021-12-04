@@ -13,22 +13,29 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         let file = File::open(path)?;
 
         let mut lines = io::BufReader::new(file).lines();
+
         let selections: Vec<u8> = lines.next().unwrap()?
             .split(",")
             .filter_map(|n| n.parse().ok())
             .collect();
 
-        let board_lines: Vec<String> = lines
-            .filter_map(|line| line.ok())
-            .filter(|line| !line.is_empty())
-            .collect();
+        let boards: Vec<BingoBoard> = {
+            let board_lines: Vec<String> = lines
+                .filter_map(|line| line.ok())
+                .filter(|line| !line.is_empty())
+                .collect();
 
-        let mut boards: Vec<BingoBoard> = board_lines.chunks_exact(BOARD_SIZE)
-            .map(|chunk| BingoBoard::try_from(TryInto::<&[String; BOARD_SIZE]>::try_into(chunk).unwrap()).unwrap())
-            .collect();
+            board_lines.chunks_exact(BOARD_SIZE)
+                .map(|chunk| BingoBoard::try_from(TryInto::<&[String; BOARD_SIZE]>::try_into(chunk).unwrap()).unwrap())
+                .collect()
+        };
 
-        if let Some(score) = get_score_from_first_winner(&mut boards, &selections) {
+        if let Some(score) = get_score_from_first_winner(boards.clone(), &selections) {
             println!("Score from first winner: {}", score);
+        }
+
+        if let Some(score) = get_score_from_last_winner(boards, &selections) {
+            println!("Score from last winner: {}", score);
         }
 
         Ok(())
@@ -37,7 +44,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-fn get_score_from_first_winner(boards: &mut [BingoBoard], selections: &[u8]) -> Option<u32> {
+fn get_score_from_first_winner(mut boards: Vec<BingoBoard>, selections: &[u8]) -> Option<u32> {
     for selection in selections {
         for board in boards.iter_mut() {
             board.mark(*selection);
@@ -51,13 +58,29 @@ fn get_score_from_first_winner(boards: &mut [BingoBoard], selections: &[u8]) -> 
     None
 }
 
+fn get_score_from_last_winner(mut boards: Vec<BingoBoard>, selections: &[u8]) -> Option<u32> {
+    for selection in selections {
+        for board in boards.iter_mut() {
+            board.mark(*selection);
+        }
+
+        if boards.len() == 1 && boards[0].is_winner() {
+            return Some(boards[0].unmarked_cell_sum() * (*selection as u32));
+        }
+
+        boards.retain(|board| !board.is_winner());
+    }
+
+    None
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Cell {
     Unmarked(u8),
     Marked(u8)
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct BingoBoard {
     cells: [[Cell; BOARD_SIZE]; BOARD_SIZE]
 }

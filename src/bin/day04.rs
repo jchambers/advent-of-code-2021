@@ -1,8 +1,8 @@
-use std::{env, error, io};
+use self::Cell::{Marked, Unmarked};
 use std::fs::File;
 use std::io::BufRead;
 use std::str::FromStr;
-use self::Cell::{Marked, Unmarked};
+use std::{env, error, io};
 
 const BOARD_SIZE: usize = 5;
 
@@ -14,7 +14,9 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
         let mut lines = io::BufReader::new(file).lines();
 
-        let selections: Vec<u8> = lines.next().unwrap()?
+        let selections: Vec<u8> = lines
+            .next()
+            .unwrap()?
             .split(",")
             .filter_map(|n| n.parse().ok())
             .collect();
@@ -25,8 +27,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 .filter(|line| !line.is_empty())
                 .collect();
 
-            board_lines.chunks_exact(BOARD_SIZE)
-                .map(|chunk| BingoBoard::try_from(TryInto::<&[String; BOARD_SIZE]>::try_into(chunk).unwrap()).unwrap())
+            board_lines
+                .chunks_exact(BOARD_SIZE)
+                .map(|chunk| {
+                    BingoBoard::try_from(TryInto::<&[String; BOARD_SIZE]>::try_into(chunk).unwrap())
+                        .unwrap()
+                })
                 .collect()
         };
 
@@ -77,12 +83,12 @@ fn get_score_from_last_winner(mut boards: Vec<BingoBoard>, selections: &[u8]) ->
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Cell {
     Unmarked(u8),
-    Marked(u8)
+    Marked(u8),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct BingoBoard {
-    cells: [[Cell; BOARD_SIZE]; BOARD_SIZE]
+    cells: [[Cell; BOARD_SIZE]; BOARD_SIZE],
 }
 
 impl BingoBoard {
@@ -107,10 +113,12 @@ impl BingoBoard {
 
         // Check for matches down columns
         for col in 0..BOARD_SIZE {
-            if self.cells.iter()
+            if self
+                .cells
+                .iter()
                 .map(|row| row[col])
-                .all(|cell| matches!(cell, Marked(_))) {
-
+                .all(|cell| matches!(cell, Marked(_)))
+            {
                 return true;
             }
         }
@@ -119,11 +127,12 @@ impl BingoBoard {
     }
 
     pub fn unmarked_cell_sum(&self) -> u32 {
-        self.cells.iter()
+        self.cells
+            .iter()
             .flat_map(|row| row)
             .map(|cell| match cell {
                 Unmarked(number) => *number as u32,
-                _ => 0
+                _ => 0,
             })
             .sum()
     }
@@ -136,7 +145,8 @@ impl TryFrom<&[String; BOARD_SIZE]> for BingoBoard {
         let mut cells = [[Unmarked(0); BOARD_SIZE]; BOARD_SIZE];
 
         for row in 0..BOARD_SIZE {
-            let numbers: Vec<u8> = rows[row].split_whitespace()
+            let numbers: Vec<u8> = rows[row]
+                .split_whitespace()
                 .filter_map(|number| u8::from_str(number).ok())
                 .collect();
 

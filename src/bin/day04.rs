@@ -120,16 +120,10 @@ impl BingoBoard {
 
     pub fn unmarked_cell_sum(&self) -> u32 {
         self.cells.iter()
-            .map(|row| {
-                row.iter()
-                    .map(|cell| {
-                        if let Unmarked(number) = cell {
-                            *number as u32
-                        } else {
-                            0
-                        }
-                    })
-                    .sum::<u32>()
+            .flat_map(|row| row)
+            .map(|cell| match cell {
+                Unmarked(number) => *number as u32,
+                _ => 0
             })
             .sum()
     }

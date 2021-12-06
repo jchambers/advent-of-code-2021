@@ -2,6 +2,7 @@ use std::cmp::{max, min};
 use std::fs::File;
 use std::io::BufRead;
 use std::{env, error, io};
+use std::collections::HashMap;
 use std::str::FromStr;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
@@ -43,7 +44,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 struct Point {
     x: usize,
     y: usize,
@@ -101,13 +102,11 @@ impl FromStr for LineSegment {
 
 #[derive(Debug, Eq, PartialEq)]
 struct VentMap {
-    cells: Vec<Vec<u32>>,
+    cells: HashMap<Point, u32>,
 }
 
 impl VentMap {
     pub fn add_line_segment(&mut self, segment: &LineSegment) {
-        self.resize_to_fit(segment);
-
         let min_x = min(segment.start.x, segment.end.x);
         let max_x = max(segment.start.x, segment.end.x);
         let min_y = min(segment.start.y, segment.end.y);
@@ -130,30 +129,17 @@ impl VentMap {
         };
 
         for (row, col) in rows.zip(cols) {
-            self.cells[row][col] += 1;
-        }
-    }
+            let point = Point { x: col, y: row };
+            let count = self.cells.get(&point).unwrap_or(&0) + 1;
 
-    fn resize_to_fit(&mut self, segment: &LineSegment) {
-        let max_x = max(max(segment.start.x, segment.end.x), self.cells.len());
-        let max_y = max(max(segment.start.y, segment.end.y), self.cells[0].len());
-
-        if max_y >= self.cells.len() {
-            self.cells.resize_with(max_y + 1, || vec![0; max_x]);
-        }
-
-        if max_x >= self.cells[0].len() {
-            self.cells
-                .iter_mut()
-                .for_each(|vec| vec.resize(max_x + 1, 0));
+            self.cells.insert(point, count);
         }
     }
 
     pub fn get_multi_vent_cell_count(&self) -> u32 {
         self.cells
-            .iter()
-            .flat_map(|row| row)
-            .filter(|&&cell| cell > 1)
+            .values()
+            .filter(|&&count| count > 1)
             .count() as u32
     }
 }
@@ -161,7 +147,7 @@ impl VentMap {
 impl Default for VentMap {
     fn default() -> Self {
         VentMap {
-            cells: vec![vec![0]],
+            cells: HashMap::new(),
         }
     }
 }

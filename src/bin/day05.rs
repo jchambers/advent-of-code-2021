@@ -81,6 +81,32 @@ impl LineSegment {
     pub fn is_vertical(&self) -> bool {
         self.start.x == self.end.x
     }
+
+    pub fn points(&self) -> Box<dyn Iterator<Item = Point>> {
+        let min_x = min(self.start.x, self.end.x);
+        let max_x = max(self.start.x, self.end.x);
+        let min_y = min(self.start.y, self.end.y);
+        let max_y = max(self.start.y, self.end.y);
+
+        let cols: Box<dyn Iterator<Item = usize>> = if self.is_vertical() {
+            Box::new(std::iter::repeat(self.start.x))
+        } else if self.start.x > self.end.x {
+            Box::new((min_x..=max_x).rev())
+        } else {
+            Box::new(min_x..=max_x)
+        };
+
+        let rows: Box<dyn Iterator<Item = usize>> = if self.is_horizontal() {
+            Box::new(std::iter::repeat(self.start.y))
+        } else if self.start.y > self.end.y {
+            Box::new((min_y..=max_y).rev())
+        } else {
+            Box::new(min_y..=max_y)
+        };
+
+        Box::new(rows.zip(cols)
+            .map(|(row, col)| Point { x: col, y: row }))
+    }
 }
 
 impl FromStr for LineSegment {
@@ -107,31 +133,8 @@ struct VentMap {
 
 impl VentMap {
     pub fn add_line_segment(&mut self, segment: &LineSegment) {
-        let min_x = min(segment.start.x, segment.end.x);
-        let max_x = max(segment.start.x, segment.end.x);
-        let min_y = min(segment.start.y, segment.end.y);
-        let max_y = max(segment.start.y, segment.end.y);
-
-        let cols: Box<dyn Iterator<Item = usize>> = if segment.is_vertical() {
-            Box::new(std::iter::repeat(segment.start.x))
-        } else if segment.start.x > segment.end.x {
-            Box::new((min_x..=max_x).rev())
-        } else {
-            Box::new(min_x..=max_x)
-        };
-
-        let rows: Box<dyn Iterator<Item = usize>> = if segment.is_horizontal() {
-            Box::new(std::iter::repeat(segment.start.y))
-        } else if segment.start.y > segment.end.y {
-            Box::new((min_y..=max_y).rev())
-        } else {
-            Box::new(min_y..=max_y)
-        };
-
-        for (row, col) in rows.zip(cols) {
-            let point = Point { x: col, y: row };
+        for point in segment.points() {
             let count = self.cells.get(&point).unwrap_or(&0) + 1;
-
             self.cells.insert(point, count);
         }
     }

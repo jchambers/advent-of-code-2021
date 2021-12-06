@@ -13,13 +13,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             .map(|respawn_time| u8::from_str(respawn_time.as_str()).unwrap())
             .collect();
 
-        let mut school = SchoolOfFish::new(&respawn_times);
+        let school = SchoolOfFish::new(&respawn_times);
 
-        school.advance_to_day(80);
-        println!("Fish after 80 days: {}", school.get_population());
-
-        school.advance_to_day(256);
-        println!("Fish after 256 days: {}", school.get_population());
+        println!("Fish after 80 days: {}", school.get_population(80));
+        println!("Fish after 256 days: {}", school.get_population(256));
 
         Ok(())
     } else {
@@ -28,34 +25,29 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 struct SchoolOfFish {
-    day: u32,
-    fish_by_respawn_time: Vec<u64>,
+    fish_by_initial_respawn_time: [u64; 9],
 }
 
 impl SchoolOfFish {
     pub fn new(respawn_times: &[u8]) -> Self {
-        let mut fish_by_respawn_time = vec![0; 9];
+        let mut fish_by_initial_respawn_time = [0; 9];
 
         respawn_times
             .iter()
-            .for_each(|&respawn_time| fish_by_respawn_time[respawn_time as usize] += 1);
+            .for_each(|&respawn_time| fish_by_initial_respawn_time[respawn_time as usize] += 1);
 
-        SchoolOfFish {
-            day: 0,
-            fish_by_respawn_time,
-        }
+        SchoolOfFish { fish_by_initial_respawn_time }
     }
 
-    pub fn advance_to_day(&mut self, time: u32) {
-        while self.day < time {
-            self.fish_by_respawn_time.rotate_left(1);
-            self.fish_by_respawn_time[6] += self.fish_by_respawn_time[8];
-            self.day += 1;
-        }
-    }
+    pub fn get_population(&self, day: u32) -> u64 {
+        let mut fish_by_respawn_time = self.fish_by_initial_respawn_time.to_vec();
 
-    pub fn get_population(&self) -> u64 {
-        self.fish_by_respawn_time.iter().sum()
+        for _ in 0..day {
+            fish_by_respawn_time.rotate_left(1);
+            fish_by_respawn_time[6] += fish_by_respawn_time[8];
+        }
+
+        fish_by_respawn_time.iter().sum()
     }
 }
 
@@ -65,15 +57,10 @@ mod test {
 
     #[test]
     fn test_advance_to_day() {
-        let mut school = SchoolOfFish::new(&[3, 4, 3, 1, 2]);
+        let school = SchoolOfFish::new(&[3, 4, 3, 1, 2]);
 
-        school.advance_to_day(18);
-        assert_eq!(26, school.get_population());
-
-        school.advance_to_day(80);
-        assert_eq!(5934, school.get_population());
-
-        school.advance_to_day(256);
-        assert_eq!(26984457539, school.get_population());
+        assert_eq!(26, school.get_population(18));
+        assert_eq!(5934, school.get_population(80));
+        assert_eq!(26984457539, school.get_population(256));
     }
 }

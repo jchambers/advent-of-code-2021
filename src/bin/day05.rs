@@ -2,6 +2,7 @@ use std::cmp::{max, min};
 use std::fs::File;
 use std::io::BufRead;
 use std::{env, error, io};
+use std::str::FromStr;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -12,7 +13,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
             io::BufReader::new(File::open(path)?)
                 .lines()
-                .map(|line| LineSegment::try_from(line.unwrap().as_str()).unwrap())
+                .map(|line| LineSegment::from_str(line.unwrap().as_str()).unwrap())
                 .filter(|segment| segment.is_horizontal() || segment.is_vertical())
                 .for_each(|segment| vent_map.add_line_segment(&segment));
 
@@ -27,7 +28,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
             io::BufReader::new(File::open(path)?)
                 .lines()
-                .map(|line| LineSegment::try_from(line.unwrap().as_str()).unwrap())
+                .map(|line| LineSegment::from_str(line.unwrap().as_str()).unwrap())
                 .for_each(|segment| vent_map.add_line_segment(&segment));
 
             println!(
@@ -48,10 +49,10 @@ struct Point {
     y: usize,
 }
 
-impl TryFrom<&str> for Point {
-    type Error = Box<dyn std::error::Error>;
+impl FromStr for Point {
+    type Err = Box<dyn std::error::Error>;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let pieces: Vec<&str> = value.split(",").collect();
 
         if pieces.len() != 2 {
@@ -81,10 +82,10 @@ impl LineSegment {
     }
 }
 
-impl TryFrom<&str> for LineSegment {
-    type Error = Box<dyn std::error::Error>;
+impl FromStr for LineSegment {
+    type Err = Box<dyn std::error::Error>;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let pieces: Vec<&str> = value.split(" -> ").collect();
 
         if pieces.len() != 2 {
@@ -92,8 +93,8 @@ impl TryFrom<&str> for LineSegment {
         }
 
         Ok(LineSegment {
-            start: Point::try_from(pieces[0])?,
-            end: Point::try_from(pieces[1])?,
+            start: Point::from_str(pieces[0])?,
+            end: Point::from_str(pieces[1])?,
         })
     }
 }
@@ -171,7 +172,7 @@ mod test {
 
     #[test]
     fn test_point_from_string() {
-        assert_eq!(Point { x: 17, y: 12 }, Point::try_from("17,12").unwrap());
+        assert_eq!(Point { x: 17, y: 12 }, Point::from_str("17,12").unwrap());
     }
 
     #[test]
@@ -181,20 +182,20 @@ mod test {
                 start: Point { x: 1, y: 2 },
                 end: Point { x: 87, y: 22 },
             },
-            LineSegment::try_from("1,2 -> 87,22").unwrap()
+            LineSegment::from_str("1,2 -> 87,22").unwrap()
         );
     }
 
     #[test]
     fn test_line_segment_is_horizontal() {
-        assert!(LineSegment::try_from("1,7 -> 12,7").unwrap().is_horizontal());
-        assert!(!LineSegment::try_from("1,7 -> 12,9").unwrap().is_horizontal());
+        assert!(LineSegment::from_str("1,7 -> 12,7").unwrap().is_horizontal());
+        assert!(!LineSegment::from_str("1,7 -> 12,9").unwrap().is_horizontal());
     }
 
     #[test]
     fn test_line_segment_is_vertical() {
-        assert!(LineSegment::try_from("12,7 -> 12,19").unwrap().is_vertical());
-        assert!(!LineSegment::try_from("7,7 -> 17,7").unwrap().is_vertical());
+        assert!(LineSegment::from_str("12,7 -> 12,19").unwrap().is_vertical());
+        assert!(!LineSegment::from_str("7,7 -> 17,7").unwrap().is_vertical());
     }
 
     #[test]
@@ -212,7 +213,7 @@ mod test {
             "5,5 -> 8,2",
         ]
         .iter()
-        .map(|line| LineSegment::try_from(*line).unwrap())
+        .map(|line| LineSegment::from_str(*line).unwrap())
         .collect();
 
         {

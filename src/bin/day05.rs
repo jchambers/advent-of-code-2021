@@ -9,12 +9,15 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
+        let segments: Vec<LineSegment> = io::BufReader::new(File::open(path)?)
+            .lines()
+            .map(|line| LineSegment::from_str(line.unwrap().as_str()).unwrap())
+            .collect();
+
         {
             let mut vent_map = VentMap::new();
 
-            io::BufReader::new(File::open(path)?)
-                .lines()
-                .map(|line| LineSegment::from_str(line.unwrap().as_str()).unwrap())
+            segments.iter()
                 .filter(|segment| segment.is_horizontal() || segment.is_vertical())
                 .for_each(|segment| vent_map.add_line_segment(&segment));
 
@@ -27,9 +30,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         {
             let mut vent_map = VentMap::new();
 
-            io::BufReader::new(File::open(path)?)
-                .lines()
-                .map(|line| LineSegment::from_str(line.unwrap().as_str()).unwrap())
+            segments.iter()
                 .for_each(|segment| vent_map.add_line_segment(&segment));
 
             println!(

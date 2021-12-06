@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     if let Some(path) = args.get(1) {
         {
-            let mut vent_map = VentMap::default();
+            let mut vent_map = VentMap::new();
 
             io::BufReader::new(File::open(path)?)
                 .lines()
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         }
 
         {
-            let mut vent_map = VentMap::default();
+            let mut vent_map = VentMap::new();
 
             io::BufReader::new(File::open(path)?)
                 .lines()
@@ -132,6 +132,10 @@ struct VentMap {
 }
 
 impl VentMap {
+    pub fn new() -> Self {
+        VentMap { cells: HashMap::new() }
+    }
+
     pub fn add_line_segment(&mut self, segment: &LineSegment) {
         for point in segment.points() {
             let count = self.cells.get(&point).unwrap_or(&0) + 1;
@@ -144,14 +148,6 @@ impl VentMap {
             .values()
             .filter(|&&count| count > 1)
             .count() as u32
-    }
-}
-
-impl Default for VentMap {
-    fn default() -> Self {
-        VentMap {
-            cells: HashMap::new(),
-        }
     }
 }
 
@@ -206,7 +202,7 @@ mod test {
         .collect();
 
         {
-            let mut vent_map = VentMap::default();
+            let mut vent_map = VentMap::new();
 
             segments
                 .iter()
@@ -217,7 +213,7 @@ mod test {
         }
 
         {
-            let mut vent_map = VentMap::default();
+            let mut vent_map = VentMap::new();
 
             segments
                 .iter()

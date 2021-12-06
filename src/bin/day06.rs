@@ -15,11 +15,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
         let mut school = SchoolOfFish::new(&ages);
 
-        for _ in 0..80 {
-            school.advance();
-        }
-
+        school.advance_to_time(80);
         println!("Fish after 80 days: {}", school.get_population());
+
+        school.advance_to_time(256);
+        println!("Fish after 256 days: {}", school.get_population());
 
         Ok(())
     } else {
@@ -28,7 +28,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 struct SchoolOfFish {
-    fish_by_age: [u32; 9],
+    time: u32,
+    fish_by_age: [u64; 9],
 }
 
 impl SchoolOfFish {
@@ -37,21 +38,25 @@ impl SchoolOfFish {
 
         ages.iter().for_each(|&age| fish_by_age[age as usize] += 1);
 
-        SchoolOfFish { fish_by_age }
+        SchoolOfFish { time: 0, fish_by_age }
     }
 
-    pub fn advance(&mut self) {
-        let resetting = self.fish_by_age[0];
+    pub fn advance_to_time(&mut self, time: u32) {
+        while self.time < time {
+            let resetting = self.fish_by_age[0];
 
-        for i in 0..self.fish_by_age.len() - 1 {
-            self.fish_by_age[i] = self.fish_by_age[i + 1];
+            for i in 0..self.fish_by_age.len() - 1 {
+                self.fish_by_age[i] = self.fish_by_age[i + 1];
+            }
+
+            self.fish_by_age[6] += resetting;
+            self.fish_by_age[8] = resetting;
+
+            self.time += 1;
         }
-
-        self.fish_by_age[6] += resetting;
-        self.fish_by_age[8] = resetting;
     }
 
-    pub fn get_population(&self) -> u32 {
+    pub fn get_population(&self) -> u64 {
         self.fish_by_age.iter().sum()
     }
 }
@@ -61,19 +66,16 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_advance() {
+    fn test_advance_to_time() {
         let mut school = SchoolOfFish::new(&[3, 4, 3, 1, 2]);
 
-        for _ in 0..18 {
-            school.advance();
-        }
-
+        school.advance_to_time(18);
         assert_eq!(26, school.get_population());
 
-        for _ in 18..80 {
-            school.advance();
-        }
-
+        school.advance_to_time(80);
         assert_eq!(5934, school.get_population());
+
+        school.advance_to_time(256);
+        assert_eq!(26984457539, school.get_population());
     }
 }

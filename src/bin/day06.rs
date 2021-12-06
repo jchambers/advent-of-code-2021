@@ -29,12 +29,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
 struct SchoolOfFish {
     time: u32,
-    fish_by_age: [u64; 9],
+    fish_by_age: Vec<u64>,
 }
 
 impl SchoolOfFish {
     pub fn new(ages: &[u8]) -> Self {
-        let mut fish_by_age = [0; 9];
+        let mut fish_by_age = vec![0; 9];
 
         ages.iter().for_each(|&age| fish_by_age[age as usize] += 1);
 
@@ -43,15 +43,8 @@ impl SchoolOfFish {
 
     pub fn advance_to_time(&mut self, time: u32) {
         while self.time < time {
-            let resetting = self.fish_by_age[0];
-
-            for i in 0..self.fish_by_age.len() - 1 {
-                self.fish_by_age[i] = self.fish_by_age[i + 1];
-            }
-
-            self.fish_by_age[6] += resetting;
-            self.fish_by_age[8] = resetting;
-
+            self.fish_by_age.rotate_left(1);
+            self.fish_by_age[6] += self.fish_by_age[8];
             self.time += 1;
         }
     }

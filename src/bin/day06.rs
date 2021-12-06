@@ -7,18 +7,18 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let ages: Vec<u8> = io::BufReader::new(File::open(path)?)
+        let respawn_times: Vec<u8> = io::BufReader::new(File::open(path)?)
             .split(',' as u8)
             .map(|chunk| String::from_utf8(chunk.unwrap()).unwrap())
-            .map(|age| u8::from_str(age.as_str()).unwrap())
+            .map(|respawn_time| u8::from_str(respawn_time.as_str()).unwrap())
             .collect();
 
-        let mut school = SchoolOfFish::new(&ages);
+        let mut school = SchoolOfFish::new(&respawn_times);
 
-        school.advance_to_time(80);
+        school.advance_to_day(80);
         println!("Fish after 80 days: {}", school.get_population());
 
-        school.advance_to_time(256);
+        school.advance_to_day(256);
         println!("Fish after 256 days: {}", school.get_population());
 
         Ok(())
@@ -28,29 +28,34 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 struct SchoolOfFish {
-    time: u32,
-    fish_by_age: Vec<u64>,
+    day: u32,
+    fish_by_respawn_time: Vec<u64>,
 }
 
 impl SchoolOfFish {
-    pub fn new(ages: &[u8]) -> Self {
-        let mut fish_by_age = vec![0; 9];
+    pub fn new(respawn_times: &[u8]) -> Self {
+        let mut fish_by_respawn_time = vec![0; 9];
 
-        ages.iter().for_each(|&age| fish_by_age[age as usize] += 1);
+        respawn_times
+            .iter()
+            .for_each(|&respawn_time| fish_by_respawn_time[respawn_time as usize] += 1);
 
-        SchoolOfFish { time: 0, fish_by_age }
+        SchoolOfFish {
+            day: 0,
+            fish_by_respawn_time,
+        }
     }
 
-    pub fn advance_to_time(&mut self, time: u32) {
-        while self.time < time {
-            self.fish_by_age.rotate_left(1);
-            self.fish_by_age[6] += self.fish_by_age[8];
-            self.time += 1;
+    pub fn advance_to_day(&mut self, time: u32) {
+        while self.day < time {
+            self.fish_by_respawn_time.rotate_left(1);
+            self.fish_by_respawn_time[6] += self.fish_by_respawn_time[8];
+            self.day += 1;
         }
     }
 
     pub fn get_population(&self) -> u64 {
-        self.fish_by_age.iter().sum()
+        self.fish_by_respawn_time.iter().sum()
     }
 }
 
@@ -59,16 +64,16 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_advance_to_time() {
+    fn test_advance_to_day() {
         let mut school = SchoolOfFish::new(&[3, 4, 3, 1, 2]);
 
-        school.advance_to_time(18);
+        school.advance_to_day(18);
         assert_eq!(26, school.get_population());
 
-        school.advance_to_time(80);
+        school.advance_to_day(80);
         assert_eq!(5934, school.get_population());
 
-        school.advance_to_time(256);
+        school.advance_to_day(256);
         assert_eq!(26984457539, school.get_population());
     }
 }

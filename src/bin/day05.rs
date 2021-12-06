@@ -1,21 +1,40 @@
-use std::{env, error, io};
 use std::cmp::{max, min};
 use std::fs::File;
 use std::io::BufRead;
+use std::{env, error, io};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let mut vent_map = VentMap::default();
+        {
+            let mut vent_map = VentMap::default();
 
-        io::BufReader::new(File::open(path)?)
-            .lines()
-            .map(|line| LineSegment::try_from(line.unwrap().as_str()).unwrap())
-            .filter(|segment| segment.is_horizontal() || segment.is_vertical())
-            .for_each(|segment| vent_map.add_line_segment(&segment));
+            io::BufReader::new(File::open(path)?)
+                .lines()
+                .map(|line| LineSegment::try_from(line.unwrap().as_str()).unwrap())
+                .filter(|segment| segment.is_horizontal() || segment.is_vertical())
+                .for_each(|segment| vent_map.add_line_segment(&segment));
 
-        println!("Cells with multiple vents (horizontal/vertical only): {}", vent_map.get_multi_vent_cell_count());
+            println!(
+                "Cells with multiple vents (horizontal/vertical only): {}",
+                vent_map.get_multi_vent_cell_count()
+            );
+        }
+
+        {
+            let mut vent_map = VentMap::default();
+
+            io::BufReader::new(File::open(path)?)
+                .lines()
+                .map(|line| LineSegment::try_from(line.unwrap().as_str()).unwrap())
+                .for_each(|segment| vent_map.add_line_segment(&segment));
+
+            println!(
+                "Cells with multiple vents (all): {}",
+                vent_map.get_multi_vent_cell_count()
+            );
+        }
 
         Ok(())
     } else {
@@ -93,23 +112,24 @@ impl VentMap {
         let min_y = min(segment.start.y, segment.end.y);
         let max_y = max(segment.start.y, segment.end.y);
 
-        let mut row = segment.start.y;
-        let mut col = segment.start.x;
+        let cols: Box<dyn Iterator<Item = usize>> = if segment.is_vertical() {
+            Box::new(std::iter::repeat(segment.start.x))
+        } else if segment.start.x > segment.end.x {
+            Box::new((min_x..=max_x).rev())
+        } else {
+            Box::new(min_x..=max_x)
+        };
 
-        while row >= min_y && row <= max_y && col >= min_x && col <= max_x {
-            self.cells[row][col] = self.cells[row][col] + 1;
+        let rows: Box<dyn Iterator<Item = usize>> = if segment.is_horizontal() {
+            Box::new(std::iter::repeat(segment.start.y))
+        } else if segment.start.y > segment.end.y {
+            Box::new((min_y..=max_y).rev())
+        } else {
+            Box::new(min_y..=max_y)
+        };
 
-            if segment.start.x < segment.end.x {
-                col += 1;
-            } else if segment.start.x > segment.end.x {
-                col -= 1;
-            }
-
-            if segment.start.y < segment.end.y {
-                row += 1;
-            } else if segment.start.y > segment.end.y {
-                row -= 1;
-            }
+        for (row, col) in rows.zip(cols) {
+            self.cells[row][col] += 1;
         }
     }
 
@@ -122,13 +142,15 @@ impl VentMap {
         }
 
         if max_x >= self.cells[0].len() {
-            self.cells.iter_mut()
+            self.cells
+                .iter_mut()
                 .for_each(|vec| vec.resize(max_x + 1, 0));
         }
     }
 
     pub fn get_multi_vent_cell_count(&self) -> u32 {
-        self.cells.iter()
+        self.cells
+            .iter()
             .flat_map(|row| row)
             .filter(|&&cell| cell > 1)
             .count() as u32
@@ -137,7 +159,9 @@ impl VentMap {
 
 impl Default for VentMap {
     fn default() -> Self {
-        VentMap { cells: vec![vec![0]] }
+        VentMap {
+            cells: vec![vec![0]],
+        }
     }
 }
 
@@ -152,10 +176,13 @@ mod test {
 
     #[test]
     fn test_line_segment_from_string() {
-        assert_eq!(LineSegment {
-            start: Point { x: 1, y: 2 },
-            end: Point { x: 87, y: 22 },
-        }, LineSegment::try_from("1,2 -> 87,22").unwrap());
+        assert_eq!(
+            LineSegment {
+                start: Point { x: 1, y: 2 },
+                end: Point { x: 87, y: 22 },
+            },
+            LineSegment::try_from("1,2 -> 87,22").unwrap()
+        );
     }
 
     #[test]
@@ -182,20 +209,31 @@ mod test {
             "0,9 -> 2,9",
             "3,4 -> 1,4",
             "0,0 -> 8,8",
-            "5,5 -> 8,2"
+            "5,5 -> 8,2",
         ]
-            .iter()
-            .map(|line| LineSegment::try_from(*line).unwrap())
-            .collect();
+        .iter()
+        .map(|line| LineSegment::try_from(*line).unwrap())
+        .collect();
 
         {
             let mut vent_map = VentMap::default();
 
-            segments.iter()
+            segments
+                .iter()
                 .filter(|segment| segment.is_horizontal() || segment.is_vertical())
                 .for_each(|segment| vent_map.add_line_segment(segment));
 
             assert_eq!(5, vent_map.get_multi_vent_cell_count());
+        }
+
+        {
+            let mut vent_map = VentMap::default();
+
+            segments
+                .iter()
+                .for_each(|segment| vent_map.add_line_segment(segment));
+
+            assert_eq!(12, vent_map.get_multi_vent_cell_count());
         }
     }
 }

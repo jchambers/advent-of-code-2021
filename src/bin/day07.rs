@@ -7,10 +7,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let positions: Vec<i32> = io::BufReader::new(File::open(path)?)
+        let positions: Vec<u32> = io::BufReader::new(File::open(path)?)
             .split(',' as u8)
             .map(|chunk| String::from_utf8(chunk.unwrap()).unwrap())
-            .map(|position| i32::from_str(position.as_str()).unwrap())
+            .map(|position| u32::from_str(position.as_str()).unwrap())
             .collect();
 
         let flotilla = CrabFlotilla::new(positions);
@@ -41,46 +41,50 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-type CostFunction = dyn Fn(i32) -> i32;
+type CostFunction = dyn Fn(u32) -> u32;
 
 struct CrabFlotilla {
-    initial_positions: Vec<i32>,
+    initial_positions: Vec<u32>,
 }
 
 impl CrabFlotilla {
-    pub fn new(initial_positions: Vec<i32>) -> Self {
+    pub fn new(initial_positions: Vec<u32>) -> Self {
         CrabFlotilla { initial_positions }
     }
 
-    pub fn optimal_alignment_target(&self, cost_function: &CostFunction) -> i32 {
+    pub fn optimal_alignment_target(&self, cost_function: &CostFunction) -> u32 {
         let min_position = *self.initial_positions.iter().min().unwrap() as usize;
         let max_position = *self.initial_positions.iter().max().unwrap() as usize;
 
-        let mut best_position = (0, i32::MAX);
+        let mut best_position = (0, u32::MAX);
 
         for target in min_position..=max_position {
-            let alignment_cost = self.alignment_cost(target as i32, cost_function);
+            let alignment_cost = self.alignment_cost(target as u32, cost_function);
 
             if alignment_cost < best_position.1 {
                 best_position = (target, alignment_cost);
             }
         }
 
-        best_position.0 as i32
+        best_position.0 as u32
     }
 
-    pub fn alignment_cost(&self, target: i32, cost_function: &CostFunction) -> i32 {
+    pub fn alignment_cost(&self, target: u32, cost_function: &CostFunction) -> u32 {
         self.initial_positions
             .iter()
-            .map(|position| cost_function(i32::abs(position - target)))
+            .map(|position| {
+                // Nightly has u32::abs_diff, which would make this much, much cleaner
+                let abs_diff = i32::abs(*position as i32 - target as i32) as u32;
+                cost_function(abs_diff)
+            })
             .sum()
     }
 
-    pub fn linear_cost(distance: i32) -> i32 {
+    pub fn linear_cost(distance: u32) -> u32 {
         distance
     }
 
-    pub fn geometric_cost(distance: i32) -> i32 {
+    pub fn geometric_cost(distance: u32) -> u32 {
         distance * (distance + 1) / 2
     }
 }

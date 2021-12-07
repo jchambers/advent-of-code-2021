@@ -15,25 +15,19 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
         let flotilla = CrabFlotilla::new(positions);
 
-        {
-            let optimal_target = flotilla.optimal_alignment_target(&CrabFlotilla::linear_cost);
+        let linear_target = flotilla.optimal_alignment_target(&CrabFlotilla::linear_cost);
 
-            println!(
-                "Optimal alignment target with linear movement cost: {} ({} fuel)",
-                optimal_target,
-                flotilla.alignment_cost(optimal_target, &CrabFlotilla::linear_cost)
-            );
-        }
+        println!(
+            "Optimal alignment target with linear movement cost: {} ({} fuel)",
+            linear_target.0, linear_target.1
+        );
 
-        {
-            let optimal_target = flotilla.optimal_alignment_target(&CrabFlotilla::geometric_cost);
+        let geometric_target = flotilla.optimal_alignment_target(&CrabFlotilla::geometric_cost);
 
-            println!(
-                "Optimal alignment target with geometric movement cost: {} ({} fuel)",
-                optimal_target,
-                flotilla.alignment_cost(optimal_target, &CrabFlotilla::geometric_cost)
-            );
-        }
+        println!(
+            "Optimal alignment target with geometric movement cost: {} ({} fuel)",
+            geometric_target.0, geometric_target.1
+        );
 
         Ok(())
     } else {
@@ -52,7 +46,7 @@ impl CrabFlotilla {
         CrabFlotilla { initial_positions }
     }
 
-    pub fn optimal_alignment_target(&self, cost_function: &CostFunction) -> u32 {
+    pub fn optimal_alignment_target(&self, cost_function: &CostFunction) -> (u32, u32) {
         let min_position = *self.initial_positions.iter().min().unwrap() as usize;
         let max_position = *self.initial_positions.iter().max().unwrap() as usize;
 
@@ -66,10 +60,10 @@ impl CrabFlotilla {
             }
         }
 
-        best_position.0 as u32
+        (best_position.0 as u32, best_position.1)
     }
 
-    pub fn alignment_cost(&self, target: u32, cost_function: &CostFunction) -> u32 {
+    fn alignment_cost(&self, target: u32, cost_function: &CostFunction) -> u32 {
         self.initial_positions
             .iter()
             .map(|position| {
@@ -97,7 +91,7 @@ mod test {
     fn test_alignment_cost() {
         let flotilla = CrabFlotilla::new(vec![16, 1, 2, 0, 4, 2, 7, 1, 2, 14]);
 
-        assert_eq!(41, flotilla.alignment_cost(1, &CrabFlotilla::linear_cost as &CostFunction));
+        assert_eq!(41, flotilla.alignment_cost(1, &CrabFlotilla::linear_cost));
         assert_eq!(37, flotilla.alignment_cost(2, &CrabFlotilla::linear_cost));
         assert_eq!(39, flotilla.alignment_cost(3, &CrabFlotilla::linear_cost));
         assert_eq!(71, flotilla.alignment_cost(10, &CrabFlotilla::linear_cost));
@@ -107,7 +101,10 @@ mod test {
     fn test_optimal_alignment_target() {
         let flotilla = CrabFlotilla::new(vec![16, 1, 2, 0, 4, 2, 7, 1, 2, 14]);
 
-        assert_eq!(2, flotilla.optimal_alignment_target(&CrabFlotilla::linear_cost));
+        assert_eq!(
+            (2, 37),
+            flotilla.optimal_alignment_target(&CrabFlotilla::linear_cost)
+        );
     }
 
     #[test]

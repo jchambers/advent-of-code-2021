@@ -66,9 +66,14 @@ impl CrabFlotilla {
     fn alignment_cost(&self, target: u32, cost_function: &CostFunction) -> u32 {
         self.initial_positions
             .iter()
-            .map(|position| {
+            .map(|&position| {
                 // Nightly has u32::abs_diff, which would make this much, much cleaner
-                let abs_diff = i32::abs(*position as i32 - target as i32) as u32;
+                let abs_diff = if position > target {
+                    position - target
+                } else {
+                    target - position
+                };
+
                 cost_function(abs_diff)
             })
             .sum()

@@ -56,11 +56,11 @@ impl CrabFlotilla {
             let alignment_cost = self.alignment_cost(target as u32, cost_function);
 
             if alignment_cost < best_position.1 {
-                best_position = (target, alignment_cost);
+                best_position = (target as u32, alignment_cost);
             }
         }
 
-        (best_position.0 as u32, best_position.1)
+        best_position
     }
 
     fn alignment_cost(&self, target: u32, cost_function: &CostFunction) -> u32 {

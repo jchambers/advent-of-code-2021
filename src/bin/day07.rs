@@ -110,6 +110,11 @@ mod test {
             (2, 37),
             flotilla.optimal_alignment_target(&CrabFlotilla::linear_cost)
         );
+
+        assert_eq!(
+            (5, 168),
+            flotilla.optimal_alignment_target(&CrabFlotilla::geometric_cost)
+        )
     }
 
     #[test]

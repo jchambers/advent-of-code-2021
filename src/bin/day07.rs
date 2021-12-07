@@ -14,19 +14,34 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             .collect();
 
         let flotilla = CrabFlotilla::new(positions);
-        let optimal_target = flotilla.optimal_alignment_target();
 
-        println!(
-            "Optimal alignment target: {} ({} fuel)",
-            optimal_target,
-            flotilla.alignment_cost(optimal_target)
-        );
+        {
+            let optimal_target = flotilla.optimal_alignment_target(&CrabFlotilla::linear_cost);
+
+            println!(
+                "Optimal alignment target with linear movement cost: {} ({} fuel)",
+                optimal_target,
+                flotilla.alignment_cost(optimal_target, &CrabFlotilla::linear_cost)
+            );
+        }
+
+        {
+            let optimal_target = flotilla.optimal_alignment_target(&CrabFlotilla::geometric_cost);
+
+            println!(
+                "Optimal alignment target with geometric movement cost: {} ({} fuel)",
+                optimal_target,
+                flotilla.alignment_cost(optimal_target, &CrabFlotilla::geometric_cost)
+            );
+        }
 
         Ok(())
     } else {
         Err("Usage: day07 INPUT_FILE_PATH".into())
     }
 }
+
+type CostFunction = dyn Fn(i32) -> i32;
 
 struct CrabFlotilla {
     initial_positions: Vec<i32>,
@@ -37,14 +52,14 @@ impl CrabFlotilla {
         CrabFlotilla { initial_positions }
     }
 
-    pub fn optimal_alignment_target(&self) -> i32 {
+    pub fn optimal_alignment_target(&self, cost_function: &CostFunction) -> i32 {
         let min_position = *self.initial_positions.iter().min().unwrap() as usize;
         let max_position = *self.initial_positions.iter().max().unwrap() as usize;
 
         let mut best_position = (0, i32::MAX);
 
         for target in min_position..=max_position {
-            let alignment_cost = self.alignment_cost(target as i32);
+            let alignment_cost = self.alignment_cost(target as i32, cost_function);
 
             if alignment_cost < best_position.1 {
                 best_position = (target, alignment_cost);
@@ -54,11 +69,19 @@ impl CrabFlotilla {
         best_position.0 as i32
     }
 
-    pub fn alignment_cost(&self, target: i32) -> i32 {
+    pub fn alignment_cost(&self, target: i32, cost_function: &CostFunction) -> i32 {
         self.initial_positions
             .iter()
-            .map(|position| i32::abs(position - target))
+            .map(|position| cost_function(i32::abs(position - target)))
             .sum()
+    }
+
+    pub fn linear_cost(distance: i32) -> i32 {
+        distance
+    }
+
+    pub fn geometric_cost(distance: i32) -> i32 {
+        distance * (distance + 1) / 2
     }
 }
 
@@ -70,16 +93,27 @@ mod test {
     fn test_alignment_cost() {
         let flotilla = CrabFlotilla::new(vec![16, 1, 2, 0, 4, 2, 7, 1, 2, 14]);
 
-        assert_eq!(41, flotilla.alignment_cost(1));
-        assert_eq!(37, flotilla.alignment_cost(2));
-        assert_eq!(39, flotilla.alignment_cost(3));
-        assert_eq!(71, flotilla.alignment_cost(10));
+        assert_eq!(41, flotilla.alignment_cost(1, &CrabFlotilla::linear_cost as &CostFunction));
+        assert_eq!(37, flotilla.alignment_cost(2, &CrabFlotilla::linear_cost));
+        assert_eq!(39, flotilla.alignment_cost(3, &CrabFlotilla::linear_cost));
+        assert_eq!(71, flotilla.alignment_cost(10, &CrabFlotilla::linear_cost));
     }
 
     #[test]
     fn test_optimal_alignment_target() {
         let flotilla = CrabFlotilla::new(vec![16, 1, 2, 0, 4, 2, 7, 1, 2, 14]);
 
-        assert_eq!(2, flotilla.optimal_alignment_target());
+        assert_eq!(2, flotilla.optimal_alignment_target(&CrabFlotilla::linear_cost));
+    }
+
+    #[test]
+    fn test_geometric_cost() {
+        assert_eq!(1, CrabFlotilla::geometric_cost(1));
+        assert_eq!(3, CrabFlotilla::geometric_cost(2));
+        assert_eq!(6, CrabFlotilla::geometric_cost(3));
+        assert_eq!(10, CrabFlotilla::geometric_cost(4));
+        assert_eq!(15, CrabFlotilla::geometric_cost(5));
+        assert_eq!(45, CrabFlotilla::geometric_cost(9));
+        assert_eq!(66, CrabFlotilla::geometric_cost(11));
     }
 }

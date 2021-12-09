@@ -273,3 +273,35 @@ D: 8
 E: 9
 F: 7
 G: 6
+
+Starting with frequency-derived positions reduces grid to:
+
+   0  2  3  6
+B
+C
+D
+F
+
+Add BE:
+
+   0  2  3  6
+B  x  O  x  x
+C     x
+D     x
+F     x
+
+Add DBE:
+
+   0  2  3  6
+B  x  O  x  x
+C  x  x
+D  O  x  x  x
+F  x  x
+
+Add CGEB:
+
+   0  2  3  6
+B  x  O  x  x
+C  x  x  O  x
+D  O  x  x  x
+F  x  x  x  O

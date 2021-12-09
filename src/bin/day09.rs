@@ -85,9 +85,7 @@ impl HeightMap {
         let mut queue = VecDeque::new();
         let mut basin_members = Vec::new();
 
-        explored.insert((origin_row, origin_col));
-        basin_members.push((origin_row, origin_col));
-        queue.extend(self.get_neighbors(origin_row, origin_col));
+        queue.push_front((origin_row, origin_col));
 
         while let Some((row, col)) = queue.pop_front() {
             if explored.insert((row, col)) {

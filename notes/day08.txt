@@ -1,0 +1,275 @@
+ 0000
+1    2
+1    2
+ 3333
+4    5
+4    5
+ 6666
+
+
+How many times will each position be lit?
+
+0: 0, 2, 3, 5, 6, 7, 8, 9
+1: 0, 4, 5, 6, 8, 9
+2: 0, 1, 2, 3, 4, 7, 8, 9
+3: 2, 3, 4, 5, 6, 8, 9
+4: 0, 2, 6, 8
+5: 0, 1, 3, 4, 5, 6, 7, 8, 9
+6: 0, 2, 3, 5, 6, 8, 9
+
+This gives us position 1 (6 occurrences), 4 (4 occurrences), and 5 (9 occurrences).
+We can get position 0 from the two/three character groups.
+We can get position 2 from the two-character group.
+
+Need to get position 3 and 6
+
+ ----
+|    |
+|    |
+ 3333
+|    |
+|    |
+ 6666
+
+In the 0/6/9 group, position 3 will appear twice, but position 6 will appear 3 times
+
+Position 3 covered by 2, 3, 4, 5, 6, 8, 9
+
+1  8       0/6/9  0/6/9  4    2/3/5 0/6/9  2/3/5 2/3/5 7
+be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb
+         0   0         0       0         0     0     0  0
+
+
+Position 0 = edb - be => d
+
+ 0000
+1    2
+1    2
+ 3333
+4    5
+4    5
+ 6666
+
+
+Add BE:
+
+- Must be 1
+- Possible positions are 2 and 5
+
+   0  1  2  3  4  5  6
+A        -        -   
+B  -  -  ?  -  -  ?  -
+C        -        -   
+D        -        -  
+E  -  -  ?  -  -  ?  -
+F        -        -   
+G        -        -   
+
+Add BDE:
+
+- Must be 7
+- Possible positions are 2, 5, and 0
+
+   0  1  2  3  4  5  6
+A  -     -        -   
+B  -  -  ?  -  -  ?  -
+C  -     -        -   
+D  ?  -  -  -  -  -  -
+E  -  -  ?  -  -  ?  -
+F  -     -        -   
+G  -     -        -   
+
+   0  1  2  3  4  5  6
+A  -     -        -   
+B  -  -  ?  -  -  ?  -
+C  -     -        -   
+D  X  -  -  -  -  -  -
+E  -  -  ?  -  -  ?  -
+F  -     -        -   
+G  -     -        -   
+
+Add BCEG:
+
+- Must be 4
+- Possible positions are 1, 2, 3, and 5
+
+   0  1  2  3  4  5  6
+A  -  -  -        -   
+B  -  -  ?  -  -  ?  -
+C  -  ?  -  ?  -  -  -
+D  X  -  -  -  -  -  -
+E  -  -  ?  -  -  ?  -
+F  -  -  -        -   
+G  -  ?  -  ?  -  -  -
+
+Try to learn more about F? Add BCDEFG:
+
+- Could be 0, 6, or 9
+- All possible positions covered
+
+   0  1  2  3  4  5  6
+A  -  -  -        -   
+B  -  -  ?  -  -  ?  -
+C  -  ?  -  ?  -  -  -
+D  X  -  -  -  -  -  -
+E  -  -  ?  -  -  ?  -
+F  -  -  -        -   
+G  -  ?  -  ?  -  -  -
+
+be:
+
+Possible digits: 1
+Possible segments:
+
+	--
+   |  *
+    --
+   |  *
+    --
+
+edb:
+
+Possible digits: 7
+Possible segments:
+
+	**
+   |  *
+    --
+   |  *
+    --
+
+cgeb:
+
+Possible digits: 4
+Possible segments:
+
+	--
+   *  *
+    **
+   |  *
+    --
+
+
+fdcge:
+
+Possible digits: 2, 3, 5
+Possible segments:
+
+    **
+   *  *
+    **
+   *  *
+    **
+
+----
+
+1  8       0/6/9  0/6/9  4    2/3/5 0/6/9  2/3/5 2/3/5 7
+be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb
+
+Idea: find cases where we can subtract all but one position to wind up with unambiguous mappings, then iterate.
+
+0 => vec![0, 1, 2, 4, 5, 6],
+1 => vec![2, 5],
+2 => vec![0, 2, 3, 4, 6],
+3 => vec![0, 2, 3, 5, 6],
+4 => vec![1, 2, 3, 5],
+5 => vec![0, 1, 3, 5, 6],
+6 => vec![0, 1, 3, 4, 5, 6],
+7 => vec![0, 2, 5],
+8 => vec![0, 1, 2, 3, 4, 5, 6],
+9 => vec![0, 1, 2, 3, 5, 6],
+
+Segments | Possible digits | Possible segments |
+be       | 1               | 2, 5
+cfbegad  | 8               | 0, 1, 2, 3, 4, 5, 6
+cbdgef   | 0, 6, 9         | 0, 1, 2, 3, 4, 5, 6
+fgaecd   | 0, 6, 9         | 0, 1, 2, 3, 4, 5, 6
+cgeb     | 4               | 1, 2, 3, 5
+fdcge    | 2, 3, 5         | 0, 1, 2, 3, 4, 5, 6
+agebfd   | 0, 6, 9         | 0, 1, 2, 3, 4, 5, 6
+fecdb    | 2, 3, 5         | 0, 1, 2, 3, 4, 5, 6
+fabcd    | 2, 3, 5         | 0, 1, 2, 3, 4, 5, 6
+edb      | 7               | 0, 2, 5
+
+Look for len((possible segments A) - (possibible segments B)) == 1:
+
+= > edb - be => d = 0
+
+Substitute!
+
+Segments | Possible digits | Unresolved segments |
+be       | 1               | 2, 5
+cfbegad  | 8               | d, 1, 2, 3, 4, 5, 6
+cbdgef   | 0, 6, 9         | (1, 2, 4, 5, 6), (1, 3, 4, 5, 6), (1, 2, 3, 5, 6)
+fgaecd   | 0, 6, 9         | (1, 2, 4, 5, 6), (1, 3, 4, 5, 6), (1, 2, 3, 5, 6)
+cgeb     | 4               | 1, 2, 3, 5
+fdcge    | 2, 3, 5         | (2, 3, 4, 6), (2, 3, 5, 6), (1, 3, 5, 6)
+agebfd   | 0, 6, 9         | (1, 2, 4, 5, 6), (1, 3, 4, 5, 6), (1, 2, 3, 5, 6)
+fecdb    | 2, 3, 5         | (2, 3, 4, 6), (2, 3, 5, 6), (1, 3, 5, 6)
+fabcd    | 2, 3, 5         | (2, 3, 4, 6), (2, 3, 5, 6), (1, 3, 5, 6)
+edb      | 7               | 2, 5
+
+----
+
+be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb
+
+Elimination-only grid approach?
+
+ 0000
+1    2
+1    2
+ 3333
+4    5
+4    5
+ 6666
+
+be (2, 5):
+
+   0  1  2  3  4  5  6
+A        x        x   
+B  x  x     x  x     x
+C        x        x   
+D        x        x  
+E  x  x     x  x     x
+F        x        x   
+G        x        x   
+
+edb (0, 2, 5):
+
+   0  1  2  3  4  5  6
+A  x     x        x   
+B  x  x     x  x     x
+C  x     x        x   
+D  O  x  x  x  x  x  x
+E  x  x     x  x     x
+F  x     x        x   
+G  x     x        x   
+
+cgeb (1, 2, 3, 5):
+bceg
+
+   0  1  2  3  4  5  6
+A  x  x  x  x  O  x  x
+B  x  x  O  x  x  x  x
+C  x  x  x  O  x  x  x
+D  O  x  x  x  x  x  x
+E  x  x  x  x  x  O  x
+F  x  x  x  x  x  x  O
+G  x  O  x  x  x  x  x
+
+1  8       0/6/9  0/6/9  4    2/3/5 0/6/9  2/3/5 2/3/5 7
+be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb
+
+Mix in frequency observations at this point?
+
+> This gives us position 1 (6 occurrences), 4 (4 occurrences), and 5 (9 occurrences).
+
+In our input:
+
+A: 4
+B: 8
+C: 7
+D: 8
+E: 9
+F: 7
+G: 6

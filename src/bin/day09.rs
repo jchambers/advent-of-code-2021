@@ -1,3 +1,4 @@
+use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
 use std::{env, error};
 
@@ -11,6 +12,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             "Total risk level at local minima: {}",
             height_map.combined_risk_level_at_local_minima()
         );
+
+        println!("Product of 3 largest basin sizes: {}", height_map.largest_basin_size_product(3));
 
         Ok(())
     } else {
@@ -71,6 +74,48 @@ impl HeightMap {
             .iter()
             .map(|&(row, col)| (self.heights[row][col] + 1) as u32)
             .sum()
+    }
+
+    fn basin_members(&self, origin_row: usize, origin_col: usize) -> Vec<(usize, usize)> {
+        if self.heights[origin_row][origin_col] == 9 {
+            return vec![];
+        }
+
+        let mut explored = HashSet::new();
+        let mut queue = VecDeque::new();
+        let mut basin_members = Vec::new();
+
+        explored.insert((origin_row, origin_col));
+        basin_members.push((origin_row, origin_col));
+        queue.extend(self.get_neighbors(origin_row, origin_col));
+
+        while let Some((row, col)) = queue.pop_front() {
+            if explored.insert((row, col)) {
+                if self.heights[row][col] < 9 {
+                    basin_members.push((row, col));
+
+                    queue.extend(self.get_neighbors(row, col).iter().filter(
+                        |&&(neighbor_row, neighbor_col)| {
+                            !explored.contains(&(neighbor_row, neighbor_col))
+                        },
+                    ));
+                }
+            }
+        }
+
+        basin_members
+    }
+
+    pub fn largest_basin_size_product(&self, n: usize) -> u32 {
+        let mut basin_sizes: Vec<u32> = self
+            .find_local_minima()
+            .iter()
+            .map(|&(row, col)| self.basin_members(row, col).len() as u32)
+            .collect();
+
+        basin_sizes.sort_by(|a, b| b.cmp(a));
+
+        basin_sizes.iter().take(n).product()
     }
 }
 
@@ -133,5 +178,22 @@ mod test {
                 .unwrap()
                 .combined_risk_level_at_local_minima()
         );
+    }
+
+    #[test]
+    fn test_find_basin_members() {
+        let height_map = HeightMap::from_str(EXAMPLE_MAP_STRING).unwrap();
+
+        assert_eq!(3, height_map.basin_members(0, 1).len());
+        assert_eq!(9, height_map.basin_members(0, 9).len());
+        assert_eq!(14, height_map.basin_members(2, 2).len());
+        assert_eq!(9, height_map.basin_members(4, 6).len());
+    }
+
+    #[test]
+    fn test_largest_basin_size_product() {
+        let height_map = HeightMap::from_str(EXAMPLE_MAP_STRING).unwrap();
+
+        assert_eq!(1134, height_map.largest_basin_size_product(3));
     }
 }

@@ -47,6 +47,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
         println!("Unambiguous output digit count: {}", count_unambiguous_output_digits(&entries));
 
+        let decoded_sum: u32 = entries.iter()
+            .map(|entry| SevenDigitDisplay::new(&entry.scrambled_digits).decode(&entry.output_digits))
+            .sum();
+
+        println!("Sum of decoded numbers: {}", decoded_sum);
+
         Ok(())
     } else {
         Err("Usage: day08 INPUT_FILE_PATH".into())
@@ -108,7 +114,7 @@ impl FromStr for NotesEntry {
 }
 
 struct SevenDigitDisplay {
-    positions_by_char: HashMap<char, u8>,
+    positions_by_character: HashMap<char, u8>,
 }
 
 impl SevenDigitDisplay {
@@ -122,61 +128,124 @@ impl SevenDigitDisplay {
     // 4    5
     //  6666
 
-    const INITIAL_CANDIDATES: [char; 7] = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    pub fn new(scrambled_digits: &[SegmentGroup; 10]) -> Self {
+        let mut positions_by_character: HashMap<char, u8> = HashMap::new();
 
-    pub fn new(scrambled_digits: &[SegmentGroup; 10]) {
-        // Initially, any character could map to any position on the seven-segment display
-        let mut candidates_by_position: [HashSet<char>; 7] = std::iter::repeat_with(|| SevenDigitDisplay::INITIAL_CANDIDATES.into_iter().collect())
-            .take(7)
-            .collect::<Vec<HashSet<char>>>()
-            .try_into()
-            .unwrap();
+        // We can use the frequency with which certain characters appear to unambiguously map some,
+        // but not all, of them to positions.
+        {
+            let mut frequencies = HashMap::new();
 
-        for segment_group in scrambled_digits {
-            // For a given segment group (a chunk of characters), we can infer which digits it might
-            // possibly represent by the number of lit segments (e.g. if there are two segments lit,
-            // the segment group can only represent the digit '1'; if there are 5 segments lit, it
-            // could be any of '2', '3', or '5').
-            let possible_digits = Self::get_digit_candidates(&segment_group);
-
-            // From the possible digits, we can figure out which segments might be lit by those
-            // digits.
-            let possible_segments = possible_digits.iter()
-                .fold(HashSet::new(), |mut segments, &digit| {
-                    segments.extend(Self::get_lit_segments(digit));
-                    segments
+            scrambled_digits.iter()
+                .for_each(|segment_group| {
+                    segment_group.iter().for_each(|character| {
+                        let count = frequencies.entry(character).or_insert(0);
+                        *count += 1;
+                    })
                 });
 
-            // Knowing which segments may be lit by a segment group tells us two important things:
-            //
-            // 1. The lit segments MAY correspond to one of the characters in the group
-            // 2. The unlit segments MUST NOT correspond to any of the characters in the group
-            //
-            // An example: we get the segment group "cg". Because it's two characters long, we know
-            // it may only correspond to the digit '1'. We know that either 'c' or 'g' must be in
-            // positions 2 or 5 (rule 1). We also know that 'c' and 'g' cannot be in positions 0, 1,
-            // 3, 4, or 6.
-            println!("Processing segment group {:?}", segment_group);
-            println!("Possible segments: {:?}", possible_segments);
-
-            for position in 0..candidates_by_position.len() {
-                if possible_segments.contains(&(position as u8)) {
-                    // The segment may be lit, and any of the characters in this group might
-                    // correspond to that segment.
-                    // println!("\tPosition {} lit; retaining characters in segment group", position);
-                    // candidates_by_position[position].retain(|candidate| segment_group.contains(candidate));
-                } else {
-                    // The segment is not lit, and cannot contain any of the characters in this
-                    // group
-                    println!("\tPosition {} not lit; removing characters in segment group", position);
-                    candidates_by_position[position].retain(|candidate| !segment_group.contains(candidate));
-                }
-
-                println!("\tCandidates for position {}: {:?}", position, candidates_by_position[position]);
+            for (&character, frequency) in frequencies {
+                match frequency {
+                    4 => positions_by_character.insert(character, 4),
+                    6 => positions_by_character.insert(character, 1),
+                    9 => positions_by_character.insert(character, 5),
+                    _ => None
+                };
             }
-
-            println!("----");
         }
+
+        // Three down, four to go! We can get position 0 by figuring out what's lit in '7', but not
+        // '1'. We can also figure out which of the segments in the '1' isn't already in the map.
+        {
+            let one_chars: HashSet<char> = scrambled_digits.iter()
+                .filter(|segment_group| segment_group.len() == 2)
+                .next()
+                .unwrap()
+                .clone()
+                .into_iter()
+                .collect();
+
+            let seven_chars: HashSet<char> = scrambled_digits.iter()
+                .filter(|segment_group| segment_group.len() == 3)
+                .next()
+                .unwrap()
+                .clone()
+                .into_iter()
+                .collect();
+
+            let top_segment_char = seven_chars.difference(&one_chars).next().unwrap();
+
+            positions_by_character.insert(*top_segment_char, 0);
+
+            // Only one of the characters in the '1' will be undefined, and that maps to position 2
+            one_chars.iter().for_each(|character| {
+                positions_by_character.entry(*character).or_insert(2);
+            });
+        }
+
+        // Five down, two to go! We can find position three because it will only appear twice among
+        // the unsolved characters in the 6-segment (0/6/9) cohort.
+        {
+            let mut frequencies = HashMap::new();
+
+            scrambled_digits.iter()
+                .filter(|segment_group| segment_group.len() == 6)
+                .for_each(|segment_group| {
+                    segment_group.iter()
+                        .filter(|character| !positions_by_character.contains_key(character))
+                        .for_each(|character| {
+                            let count = frequencies.entry(character).or_insert(0);
+                            *count += 1;
+                        });
+                });
+
+            let middle_character = frequencies.iter()
+                .filter_map(|(character, &count)| {
+                    if count == 2 {
+                        Some(character)
+                    } else {
+                        None
+                    }
+                })
+                .next()
+                .unwrap();
+
+            positions_by_character.insert(**middle_character, 3);
+        }
+
+        // Six down! Whatever is left is in position 6.
+        for character in ['a', 'b', 'c', 'd', 'e', 'f', 'g'] {
+            positions_by_character.entry(character).or_insert(6);
+        }
+
+        SevenDigitDisplay { positions_by_character }
+    }
+
+    pub fn decode(&self, segment_groups: &[SegmentGroup]) -> u32 {
+        let mut decoded = 0;
+
+        for segment_group in segment_groups {
+            decoded *= 10;
+            decoded += self.decode_digit(segment_group) as u32;
+        }
+
+        decoded
+    }
+
+    fn decode_digit(&self, segment: &SegmentGroup) -> u8 {
+        let mut lit_positions: Vec<u8> = segment.iter()
+            .map(|character| *self.positions_by_character.get(character).unwrap())
+            .collect();
+
+        lit_positions.sort();
+
+        for digit in 0..=9 {
+            if lit_positions == Self::get_lit_segments(digit) {
+                return digit;
+            }
+        }
+
+        unreachable!()
     }
 
     pub fn get_digit_candidates(segments: &SegmentGroup) -> Vec<u8> {
@@ -273,11 +342,33 @@ mod test {
     }
 
     #[test]
-    fn test_i_have_no_idea_what_im_doing() {
+    fn test_decode_digit() {
         let entry =
-            NotesEntry::from_str("be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb | fdgacbe cefdb cefbgd gcbe")
+            NotesEntry::from_str("acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab | cdfeb fcadb cdfeb cdbaf")
                 .unwrap();
 
-        SevenDigitDisplay::new(&entry.scrambled_digits);
+        let display = SevenDigitDisplay::new(&entry.scrambled_digits);
+
+        assert_eq!(8, display.decode_digit(&("acedgfb".chars().collect())));
+        assert_eq!(5, display.decode_digit(&("cdfbe".chars().collect())));
+        assert_eq!(2, display.decode_digit(&("gcdfa".chars().collect())));
+        assert_eq!(3, display.decode_digit(&("fbcad".chars().collect())));
+        assert_eq!(7, display.decode_digit(&("dab".chars().collect())));
+        assert_eq!(9, display.decode_digit(&("cefabd".chars().collect())));
+        assert_eq!(6, display.decode_digit(&("cdfgeb".chars().collect())));
+        assert_eq!(4, display.decode_digit(&("eafb".chars().collect())));
+        assert_eq!(0, display.decode_digit(&("cagedb".chars().collect())));
+        assert_eq!(1, display.decode_digit(&("ab".chars().collect())));
+    }
+
+    #[test]
+    fn test_decode() {
+        let entry =
+            NotesEntry::from_str("acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab | cdfeb fcadb cdfeb cdbaf")
+                .unwrap();
+
+        let display = SevenDigitDisplay::new(&entry.scrambled_digits);
+
+        assert_eq!(5353, display.decode(&entry.output_digits));
     }
 }

@@ -27,4 +27,10 @@ name = "day07"
 [[bin]]
 name = "day08"
 
+[[bin]]
+name = "day09"
+
 [dependencies]
+
+[dev-dependencies]
+indoc = "1.0"

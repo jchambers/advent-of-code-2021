@@ -24,31 +24,42 @@ struct HeightMap {
 }
 
 impl HeightMap {
-    fn find_local_minima(&self) -> Vec<u8> {
+    fn get_neighbors(&self, row: usize, col: usize) -> Vec<(usize, usize)> {
+        let mut neighbors = Vec::new();
+
+        if row > 0 {
+            neighbors.push((row - 1, col));
+        }
+
+        if row < self.heights.len() - 1 {
+            neighbors.push((row + 1, col));
+        }
+
+        if col > 0 {
+            neighbors.push((row, col - 1));
+        }
+
+        if col < self.heights[row].len() - 1 {
+            neighbors.push((row, col + 1));
+        }
+
+        neighbors
+    }
+
+    fn find_local_minima(&self) -> Vec<(usize, usize)> {
         let mut local_minima = Vec::new();
 
         for row in 0..self.heights.len() {
             for col in 0..self.heights[row].len() {
-                let height = self.heights[row][col];
-
-                if row > 0 && self.heights[row - 1][col] <= height {
-                    continue;
+                if !self
+                    .get_neighbors(row, col)
+                    .iter()
+                    .any(|&(neighbor_row, neighbor_col)| {
+                        self.heights[neighbor_row][neighbor_col] <= self.heights[row][col]
+                    })
+                {
+                    local_minima.push((row, col));
                 }
-
-                if row < self.heights.len() - 1 && self.heights[row + 1][col] <= height {
-                    continue;
-                }
-
-                if col > 0 && self.heights[row][col - 1] <= height {
-                    continue;
-                }
-
-                if col < self.heights[row].len() - 1 && self.heights[row][col + 1] <= height {
-                    continue;
-                }
-
-                // If we made it this far, the height at (row, col) is a local minimum
-                local_minima.push(height);
             }
         }
 
@@ -58,7 +69,7 @@ impl HeightMap {
     pub fn combined_risk_level_at_local_minima(&self) -> u32 {
         self.find_local_minima()
             .iter()
-            .map(|height| (height + 1) as u32)
+            .map(|&(row, col)| (self.heights[row][col] + 1) as u32)
             .sum()
     }
 }
@@ -107,7 +118,7 @@ mod test {
     #[test]
     fn test_find_local_minima() {
         assert_eq!(
-            vec![1, 0, 5, 5],
+            vec![(0, 1), (0, 9), (2, 2), (4, 6)],
             HeightMap::from_str(EXAMPLE_MAP_STRING)
                 .unwrap()
                 .find_local_minima()

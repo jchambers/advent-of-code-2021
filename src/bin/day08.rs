@@ -1,4 +1,5 @@
 use std::{env, error, io};
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufRead;
 use std::str::FromStr;
@@ -107,9 +108,77 @@ impl FromStr for NotesEntry {
 }
 
 struct SevenDigitDisplay {
+    positions_by_char: HashMap<char, u8>,
 }
 
 impl SevenDigitDisplay {
+    // Positions by number:
+    //
+    //  0000
+    // 1    2
+    // 1    2
+    //  3333
+    // 4    5
+    // 4    5
+    //  6666
+
+    const INITIAL_CANDIDATES: [char; 7] = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+    pub fn new(scrambled_digits: &[SegmentGroup; 10]) {
+        // Initially, any character could map to any position on the seven-segment display
+        let mut candidates_by_position: [HashSet<char>; 7] = std::iter::repeat_with(|| SevenDigitDisplay::INITIAL_CANDIDATES.into_iter().collect())
+            .take(7)
+            .collect::<Vec<HashSet<char>>>()
+            .try_into()
+            .unwrap();
+
+        for segment_group in scrambled_digits {
+            // For a given segment group (a chunk of characters), we can infer which digits it might
+            // possibly represent by the number of lit segments (e.g. if there are two segments lit,
+            // the segment group can only represent the digit '1'; if there are 5 segments lit, it
+            // could be any of '2', '3', or '5').
+            let possible_digits = Self::get_digit_candidates(&segment_group);
+
+            // From the possible digits, we can figure out which segments might be lit by those
+            // digits.
+            let possible_segments = possible_digits.iter()
+                .fold(HashSet::new(), |mut segments, &digit| {
+                    segments.extend(Self::get_lit_segments(digit));
+                    segments
+                });
+
+            // Knowing which segments may be lit by a segment group tells us two important things:
+            //
+            // 1. The lit segments MAY correspond to one of the characters in the group
+            // 2. The unlit segments MUST NOT correspond to any of the characters in the group
+            //
+            // An example: we get the segment group "cg". Because it's two characters long, we know
+            // it may only correspond to the digit '1'. We know that either 'c' or 'g' must be in
+            // positions 2 or 5 (rule 1). We also know that 'c' and 'g' cannot be in positions 0, 1,
+            // 3, 4, or 6.
+            println!("Processing segment group {:?}", segment_group);
+            println!("Possible segments: {:?}", possible_segments);
+
+            for position in 0..candidates_by_position.len() {
+                if possible_segments.contains(&(position as u8)) {
+                    // The segment may be lit, and any of the characters in this group might
+                    // correspond to that segment.
+                    // println!("\tPosition {} lit; retaining characters in segment group", position);
+                    // candidates_by_position[position].retain(|candidate| segment_group.contains(candidate));
+                } else {
+                    // The segment is not lit, and cannot contain any of the characters in this
+                    // group
+                    println!("\tPosition {} not lit; removing characters in segment group", position);
+                    candidates_by_position[position].retain(|candidate| !segment_group.contains(candidate));
+                }
+
+                println!("\tCandidates for position {}: {:?}", position, candidates_by_position[position]);
+            }
+
+            println!("----");
+        }
+    }
+
     pub fn get_digit_candidates(segments: &SegmentGroup) -> Vec<u8> {
         match segments.len() {
             2 => vec![1],
@@ -118,6 +187,23 @@ impl SevenDigitDisplay {
             5 => vec![2, 3, 5],
             6 => vec![0, 6, 9],
             7 => vec![8],
+            _ => unreachable!()
+        }
+    }
+
+    pub fn get_lit_segments(digit: u8) -> Vec<u8> {
+        // See diagram above
+        match digit {
+            0 => vec![0, 1, 2, 4, 5, 6],
+            1 => vec![2, 5],
+            2 => vec![0, 2, 3, 4, 6],
+            3 => vec![0, 2, 3, 5, 6],
+            4 => vec![1, 2, 3, 5],
+            5 => vec![0, 1, 3, 5, 6],
+            6 => vec![0, 1, 3, 4, 5, 6],
+            7 => vec![0, 2, 5],
+            8 => vec![0, 1, 2, 3, 4, 5, 6],
+            9 => vec![0, 1, 2, 3, 5, 6],
             _ => unreachable!()
         }
     }
@@ -184,5 +270,14 @@ mod test {
             .collect();
 
         assert_eq!(26, count_unambiguous_output_digits(&entries));
+    }
+
+    #[test]
+    fn test_i_have_no_idea_what_im_doing() {
+        let entry =
+            NotesEntry::from_str("be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb | fdgacbe cefdb cefbgd gcbe")
+                .unwrap();
+
+        SevenDigitDisplay::new(&entry.scrambled_digits);
     }
 }

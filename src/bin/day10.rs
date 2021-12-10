@@ -33,8 +33,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
 #[derive(Debug, Eq, PartialEq)]
 enum NavigationSyntaxError {
-    Incomplete { expected: String },
-    Invalid { expected: char, found: char },
+    Incomplete(String),
+    Invalid(char),
 }
 
 fn analyze_line(line: &str) -> Result<(), NavigationSyntaxError> {
@@ -49,10 +49,7 @@ fn analyze_line(line: &str) -> Result<(), NavigationSyntaxError> {
                 if stack.front() == Some(&expected_opener) {
                     stack.pop_front();
                 } else {
-                    return Err(Invalid {
-                        expected: expected_closer(stack.front().unwrap()),
-                        found: c,
-                    });
+                    return Err(Invalid(c));
                 }
             }
             _ => {}
@@ -66,7 +63,7 @@ fn analyze_line(line: &str) -> Result<(), NavigationSyntaxError> {
             expected.push(expected_closer(&opener));
         }
 
-        Err(Incomplete { expected })
+        Err(Incomplete(expected))
     } else {
         Ok(())
     }
@@ -93,11 +90,7 @@ fn expected_opener(closer: &char) -> char {
 }
 
 fn syntax_score(line: &str) -> u32 {
-    if let Err(Invalid {
-        expected: _,
-        found: c,
-    }) = analyze_line(line)
-    {
+    if let Err(Invalid(c)) = analyze_line(line) {
         match c {
             ')' => 3,
             ']' => 57,
@@ -111,10 +104,7 @@ fn syntax_score(line: &str) -> u32 {
 }
 
 fn autocomplete_score(line: &str) -> u64 {
-    if let Err(Incomplete {
-        expected: completion,
-    }) = analyze_line(line)
-    {
+    if let Err(Incomplete(completion)) = analyze_line(line) {
         completion
             .chars()
             .map(|c| match c {
@@ -169,70 +159,33 @@ mod test {
         assert_eq!(Ok(()), analyze_line("[<>({}){}[([])<>]]"));
         assert_eq!(Ok(()), analyze_line("(((((((((())))))))))"));
 
-        assert_eq!(
-            Err(Invalid {
-                expected: ')',
-                found: ']'
-            }),
-            analyze_line("(]")
-        );
+        assert_eq!(Err(Invalid(']')), analyze_line("(]"));
+        assert_eq!(Err(Invalid('>')), analyze_line("{()()()>"));
+        assert_eq!(Err(Invalid('}')), analyze_line("(((()))}"));
+        assert_eq!(Err(Invalid(')')), analyze_line("<([]){()}[{}])"));
 
         assert_eq!(
-            Err(Invalid {
-                expected: '}',
-                found: '>'
-            }),
-            analyze_line("{()()()>")
-        );
-
-        assert_eq!(
-            Err(Invalid {
-                expected: ')',
-                found: '}'
-            }),
-            analyze_line("(((()))}")
-        );
-
-        assert_eq!(
-            Err(Invalid {
-                expected: '>',
-                found: ')'
-            }),
-            analyze_line("<([]){()}[{}])")
-        );
-
-        assert_eq!(
-            Err(Incomplete {
-                expected: String::from("}}]])})]")
-            }),
+            Err(Incomplete(String::from("}}]])})]"))),
             analyze_line("[({(<(())[]>[[{[]{<()<>>")
         );
 
         assert_eq!(
-            Err(Incomplete {
-                expected: String::from(")}>]})")
-            }),
+            Err(Incomplete(String::from(")}>]})"))),
             analyze_line("[(()[<>])]({[<{<<[]>>(")
         );
 
         assert_eq!(
-            Err(Incomplete {
-                expected: String::from("}}>}>))))")
-            }),
+            Err(Incomplete(String::from("}}>}>))))"))),
             analyze_line("(((({<>}<{<{<>}{[]{[]{}")
         );
 
         assert_eq!(
-            Err(Incomplete {
-                expected: String::from("]]}}]}]}>")
-            }),
+            Err(Incomplete(String::from("]]}}]}]}>"))),
             analyze_line("{<[[]]>}<{[{[{[]{()[[[]")
         );
 
         assert_eq!(
-            Err(Incomplete {
-                expected: String::from("])}>")
-            }),
+            Err(Incomplete(String::from("])}>"))),
             analyze_line("<{([{{}}[<[[[<>{}]]]>[]]")
         );
     }

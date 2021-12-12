@@ -80,29 +80,25 @@ impl CaveGraph {
             true
         } else if cave == "start" {
             false
+        } else if !path.contains(&cave) {
+            // Always allow small caves if they're not the start/end and they're not already
+            // in the path
+            true
+        } else if allow_small_cave_revisit {
+            // Allow revisiting of a single small cave; that can only happen if no other
+            // small cave has been visited more than once
+            path.iter()
+                .filter(|c| !Self::is_big_cave(c))
+                .fold(HashMap::new(), |mut visits, c| {
+                    *visits.entry(c).or_insert(0) += 1;
+                    visits
+                })
+                .values()
+                .max()
+                .unwrap_or(&0)
+                < &2
         } else {
-            if allow_small_cave_revisit {
-                if path.contains(&cave) {
-                    // Allow revisiting of a single small cave; that can only happen if no other
-                    // small cave has been visited more than once
-                    path.iter()
-                        .filter(|c| !Self::is_big_cave(c))
-                        .fold(HashMap::new(), |mut visits, c| {
-                            *visits.entry(c).or_insert(0) += 1;
-                            visits
-                        })
-                        .values()
-                        .max()
-                        .unwrap_or(&0)
-                        < &2
-                } else {
-                    // Always allow small caves if they're not the start/end and they're not already
-                    // in the path
-                    true
-                }
-            } else {
-                !path.contains(&cave)
-            }
+            false
         }
     }
 }

@@ -384,8 +384,7 @@ mod test {
             start-RW
         "};
 
-        assert_eq!(
-            3509,
+        assert_eq!(3509,
             CaveGraph::from_str(large_cave_graph_string)
                 .unwrap()
                 .find_paths(true)
@@ -395,57 +394,21 @@ mod test {
 
     #[test]
     fn test_allow_visit() {
-        assert!(!CaveGraph::allow_visit(
-            "start",
-            &vec!["start", "a", "b"],
-            false
-        ));
-        assert!(!CaveGraph::allow_visit(
-            "start",
-            &vec!["start", "a", "b"],
-            true
-        ));
+        assert!(!CaveGraph::allow_visit("start", &vec!["start", "a", "b"], false));
+        assert!(!CaveGraph::allow_visit("start", &vec!["start", "a", "b"], true));
 
         assert!(CaveGraph::allow_visit("c", &vec!["start", "a", "b"], false));
         assert!(CaveGraph::allow_visit("c", &vec!["start", "a", "b"], true));
 
-        assert!(!CaveGraph::allow_visit(
-            "a",
-            &vec!["start", "a", "b"],
-            false
-        ));
+        assert!(!CaveGraph::allow_visit("a", &vec!["start", "a", "b"], false));
         assert!(CaveGraph::allow_visit("a", &vec!["start", "a", "b"], true));
 
-        assert!(!CaveGraph::allow_visit(
-            "a",
-            &vec!["start", "a", "b", "a"],
-            false
-        ));
-        assert!(!CaveGraph::allow_visit(
-            "a",
-            &vec!["start", "a", "b", "a"],
-            true
-        ));
-        assert!(!CaveGraph::allow_visit(
-            "b",
-            &vec!["start", "a", "b", "a"],
-            false
-        ));
-        assert!(!CaveGraph::allow_visit(
-            "b",
-            &vec!["start", "a", "b", "a"],
-            true
-        ));
+        assert!(!CaveGraph::allow_visit("a", &vec!["start", "a", "b", "a"], false));
+        assert!(!CaveGraph::allow_visit("a", &vec!["start", "a", "b", "a"], true));
+        assert!(!CaveGraph::allow_visit("b", &vec!["start", "a", "b", "a"], false));
+        assert!(!CaveGraph::allow_visit("b", &vec!["start", "a", "b", "a"], true));
 
-        assert!(CaveGraph::allow_visit(
-            "A",
-            &vec!["start", "A", "a", "A", "b", "a"],
-            false
-        ));
-        assert!(CaveGraph::allow_visit(
-            "A",
-            &vec!["start", "A", "a", "A", "b", "a"],
-            true
-        ));
+        assert!(CaveGraph::allow_visit("A", &vec!["start", "A", "a", "A", "b", "a"], false));
+        assert!(CaveGraph::allow_visit("A", &vec!["start", "A", "a", "A", "b", "a"], true));
     }
 }

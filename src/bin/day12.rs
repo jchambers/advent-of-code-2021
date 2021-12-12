@@ -87,16 +87,11 @@ impl CaveGraph {
         } else if allow_small_cave_revisit {
             // Allow revisiting of a single small cave; that can only happen if no other
             // small cave has been visited more than once
+            let mut visited_caves = HashSet::new();
+
             path.iter()
-                .filter(|c| !Self::is_big_cave(c))
-                .fold(HashMap::new(), |mut visits, c| {
-                    *visits.entry(c).or_insert(0) += 1;
-                    visits
-                })
-                .values()
-                .max()
-                .unwrap_or(&0)
-                < &2
+                .filter(|&c| !Self::is_big_cave(c))
+                .all(|c| visited_caves.insert(c))
         } else {
             false
         }

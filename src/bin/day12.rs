@@ -9,7 +9,15 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     if let Some(path) = args.get(1) {
         let cave_graph = CaveGraph::from_str(std::fs::read_to_string(path)?.as_str())?;
 
-        println!("Distinct paths through caves: {}", cave_graph.find_paths().len());
+        println!(
+            "Distinct paths through caves (revisiting small caves not allowed): {}",
+            cave_graph.find_paths(false).len()
+        );
+
+        println!(
+            "Distinct paths through caves (revisiting small caves allowed): {}",
+            cave_graph.find_paths(true).len()
+        );
 
         Ok(())
     } else {
@@ -23,7 +31,7 @@ struct CaveGraph {
 }
 
 impl CaveGraph {
-    pub fn find_paths(&self) -> HashSet<Vec<&str>> {
+    pub fn find_paths(&self, allow_small_cave_revisit: bool) -> HashSet<Vec<&str>> {
         let mut paths = HashSet::new();
 
         let mut current_path = Vec::new();
@@ -42,8 +50,11 @@ impl CaveGraph {
                             .unwrap()
                             .iter()
                             .filter(|&connection| {
-                                Self::is_big_cave(connection)
-                                    || !current_path.contains(&connection.as_str())
+                                Self::allow_visit(
+                                    connection,
+                                    &current_path,
+                                    allow_small_cave_revisit,
+                                )
                             })
                             .for_each(|connection| {
                                 exploration_stack.push(Backtrack);
@@ -62,6 +73,37 @@ impl CaveGraph {
 
     fn is_big_cave(cave_id: &str) -> bool {
         cave_id == cave_id.to_uppercase()
+    }
+
+    fn allow_visit(cave: &str, path: &Vec<&str>, allow_small_cave_revisit: bool) -> bool {
+        if Self::is_big_cave(cave) {
+            true
+        } else if cave == "start" {
+            false
+        } else {
+            if allow_small_cave_revisit {
+                if path.contains(&cave) {
+                    // Allow revisiting of a single small cave; that can only happen if no other
+                    // small cave has been visited more than once
+                    path.iter()
+                        .filter(|c| !Self::is_big_cave(c))
+                        .fold(HashMap::new(), |mut visits, c| {
+                            *visits.entry(c).or_insert(0) += 1;
+                            visits
+                        })
+                        .values()
+                        .max()
+                        .unwrap_or(&0)
+                        < &2
+                } else {
+                    // Always allow small caves if they're not the start/end and they're not already
+                    // in the path
+                    true
+                }
+            } else {
+                !path.contains(&cave)
+            }
+        }
     }
 }
 
@@ -193,7 +235,9 @@ mod test {
 
         assert_eq!(
             expected,
-            CaveGraph::from_str(TEST_CAVE_STRING).unwrap().find_paths()
+            CaveGraph::from_str(TEST_CAVE_STRING)
+                .unwrap()
+                .find_paths(false)
         );
 
         let medium_cave_graph_string = indoc! {"
@@ -209,7 +253,13 @@ mod test {
             kj-dc
         "};
 
-        assert_eq!(19, CaveGraph::from_str(medium_cave_graph_string).unwrap().find_paths().len());
+        assert_eq!(
+            19,
+            CaveGraph::from_str(medium_cave_graph_string)
+                .unwrap()
+                .find_paths(false)
+                .len()
+        );
 
         let large_cave_graph_string = indoc! {"
             fs-end
@@ -232,6 +282,170 @@ mod test {
             start-RW
         "};
 
-        assert_eq!(226, CaveGraph::from_str(large_cave_graph_string).unwrap().find_paths().len());
+        assert_eq!(
+            226,
+            CaveGraph::from_str(large_cave_graph_string)
+                .unwrap()
+                .find_paths(false)
+                .len()
+        );
+    }
+
+    #[test]
+    fn test_find_paths_with_revisit() {
+        let expected = {
+            let mut expected = HashSet::new();
+            expected.insert(vec!["start", "A", "b", "A", "b", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "A", "b", "A", "b", "A", "end"]);
+            expected.insert(vec!["start", "A", "b", "A", "b", "end"]);
+            expected.insert(vec!["start", "A", "b", "A", "c", "A", "b", "A", "end"]);
+            expected.insert(vec!["start", "A", "b", "A", "c", "A", "b", "end"]);
+            expected.insert(vec!["start", "A", "b", "A", "c", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "A", "b", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "A", "b", "A", "end"]);
+            expected.insert(vec!["start", "A", "b", "d", "b", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "A", "b", "d", "b", "A", "end"]);
+            expected.insert(vec!["start", "A", "b", "d", "b", "end"]);
+            expected.insert(vec!["start", "A", "b", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "b", "A", "b", "A", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "b", "A", "b", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "b", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "b", "A", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "b", "d", "b", "A", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "b", "d", "b", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "b", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "c", "A", "b", "A", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "c", "A", "b", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "A", "end"]);
+            expected.insert(vec!["start", "b", "A", "b", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "b", "A", "b", "A", "end"]);
+            expected.insert(vec!["start", "b", "A", "b", "end"]);
+            expected.insert(vec!["start", "b", "A", "c", "A", "b", "A", "end"]);
+            expected.insert(vec!["start", "b", "A", "c", "A", "b", "end"]);
+            expected.insert(vec!["start", "b", "A", "c", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "b", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "b", "A", "end"]);
+            expected.insert(vec!["start", "b", "d", "b", "A", "c", "A", "end"]);
+            expected.insert(vec!["start", "b", "d", "b", "A", "end"]);
+            expected.insert(vec!["start", "b", "d", "b", "end"]);
+            expected.insert(vec!["start", "b", "end"]);
+
+            expected
+        };
+
+        assert_eq!(
+            expected,
+            CaveGraph::from_str(TEST_CAVE_STRING)
+                .unwrap()
+                .find_paths(true)
+        );
+
+        let medium_cave_graph_string = indoc! {"
+            dc-end
+            HN-start
+            start-kj
+            dc-start
+            dc-HN
+            LN-dc
+            HN-end
+            kj-sa
+            kj-HN
+            kj-dc
+        "};
+
+        assert_eq!(
+            103,
+            CaveGraph::from_str(medium_cave_graph_string)
+                .unwrap()
+                .find_paths(true)
+                .len()
+        );
+
+        let large_cave_graph_string = indoc! {"
+            fs-end
+            he-DX
+            fs-he
+            start-DX
+            pj-DX
+            end-zg
+            zg-sl
+            zg-pj
+            pj-he
+            RW-he
+            fs-DX
+            pj-RW
+            zg-RW
+            start-pj
+            he-WI
+            zg-he
+            pj-fs
+            start-RW
+        "};
+
+        assert_eq!(
+            3509,
+            CaveGraph::from_str(large_cave_graph_string)
+                .unwrap()
+                .find_paths(true)
+                .len()
+        );
+    }
+
+    #[test]
+    fn test_allow_visit() {
+        assert!(!CaveGraph::allow_visit(
+            "start",
+            &vec!["start", "a", "b"],
+            false
+        ));
+        assert!(!CaveGraph::allow_visit(
+            "start",
+            &vec!["start", "a", "b"],
+            true
+        ));
+
+        assert!(CaveGraph::allow_visit("c", &vec!["start", "a", "b"], false));
+        assert!(CaveGraph::allow_visit("c", &vec!["start", "a", "b"], true));
+
+        assert!(!CaveGraph::allow_visit(
+            "a",
+            &vec!["start", "a", "b"],
+            false
+        ));
+        assert!(CaveGraph::allow_visit("a", &vec!["start", "a", "b"], true));
+
+        assert!(!CaveGraph::allow_visit(
+            "a",
+            &vec!["start", "a", "b", "a"],
+            false
+        ));
+        assert!(!CaveGraph::allow_visit(
+            "a",
+            &vec!["start", "a", "b", "a"],
+            true
+        ));
+        assert!(!CaveGraph::allow_visit(
+            "b",
+            &vec!["start", "a", "b", "a"],
+            false
+        ));
+        assert!(!CaveGraph::allow_visit(
+            "b",
+            &vec!["start", "a", "b", "a"],
+            true
+        ));
+
+        assert!(CaveGraph::allow_visit(
+            "A",
+            &vec!["start", "A", "a", "A", "b", "a"],
+            false
+        ));
+        assert!(CaveGraph::allow_visit(
+            "A",
+            &vec!["start", "A", "a", "A", "b", "a"],
+            true
+        ));
     }
 }

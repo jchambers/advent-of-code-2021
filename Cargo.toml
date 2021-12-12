@@ -43,3 +43,6 @@ name = "day12"
 
 [dev-dependencies]
 indoc = "1.0"
+
+[profile.release]
+debug = true

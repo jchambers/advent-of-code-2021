@@ -72,7 +72,7 @@ impl CaveGraph {
     }
 
     fn is_big_cave(cave_id: &str) -> bool {
-        cave_id == cave_id.to_uppercase()
+        cave_id.chars().all(|c| c.is_uppercase())
     }
 
     fn allow_visit(cave: &str, path: &Vec<&str>, allow_small_cave_revisit: bool) -> bool {

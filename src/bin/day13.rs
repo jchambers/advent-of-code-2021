@@ -10,31 +10,20 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        {
-            let (page, folds) = load_page_and_folds(
-                io::BufReader::new(File::open(path)?)
-                    .lines()
-                    .filter_map(|line| line.ok()),
-            );
+        let (page, folds) = load_page_and_folds(
+            io::BufReader::new(File::open(path)?)
+                .lines()
+                .filter_map(|line| line.ok()),
+        );
 
-            println!(
-                "Dots visible after first fold: {}",
-                page.apply_fold(&folds[0]).distinct_points()
-            );
-        }
+        let page = page.apply_folds(&folds[0..1]);
 
-        {
-            let (page, folds) = load_page_and_folds(
-                io::BufReader::new(File::open(path)?)
-                    .lines()
-                    .filter_map(|line| line.ok()),
-            );
+        println!("Dots visible after first fold: {}", page.distinct_points());
 
-            println!(
-                "Page after applying all folds:\n{}",
-                page.apply_folds(&folds)
-            );
-        }
+        println!(
+            "Page after applying all folds:\n{}",
+            page.apply_folds(&folds[1..])
+        );
 
         Ok(())
     } else {
@@ -111,6 +100,7 @@ impl TransparentPage {
                     }
                 })
                 .collect(),
+
             Vertical(x) => self
                 .points
                 .iter()
@@ -138,7 +128,6 @@ impl TransparentPage {
 impl Display for TransparentPage {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let max_x = self.points.iter().map(|point| point.x).max().unwrap_or(0);
-
         let max_y = self.points.iter().map(|point| point.y).max().unwrap_or(0);
 
         for y in 0..=max_y {

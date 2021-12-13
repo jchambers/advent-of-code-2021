@@ -144,9 +144,9 @@ impl Display for TransparentPage {
         for y in 0..=max_y {
             for x in 0..=max_x {
                 if self.points.contains(&Point { x, y }) {
-                    write!(f, "#")?;
+                    write!(f, "█")?;
                 } else {
-                    write!(f, ".")?;
+                    write!(f, " ")?;
                 }
             }
 

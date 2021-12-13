@@ -85,37 +85,27 @@ impl TransparentPage {
     }
 
     fn apply_fold(self, fold: &Fold) -> Self {
-        let points = match fold {
-            Horizontal(y) => self
-                .points
-                .iter()
-                .map(|point| {
-                    if point.y > *y {
-                        Point {
-                            x: point.x,
-                            y: y - (point.y - y),
+        let points = self.points
+            .iter()
+            .map(|point| {
+                match fold {
+                    Horizontal(y) => {
+                        if point.y > *y {
+                            Point { x: point.x, y: y - (point.y - y) }
+                        } else {
+                            point.clone()
                         }
-                    } else {
-                        point.clone()
                     }
-                })
-                .collect(),
-
-            Vertical(x) => self
-                .points
-                .iter()
-                .map(|point| {
-                    if point.x > *x {
-                        Point {
-                            x: x - (point.x - x),
-                            y: point.y,
+                    Vertical(x) => {
+                        if point.x > *x {
+                            Point { x: x - (point.x - x), y: point.y }
+                        } else {
+                            point.clone()
                         }
-                    } else {
-                        point.clone()
                     }
-                })
-                .collect(),
-        };
+                }
+            })
+            .collect();
 
         TransparentPage { points }
     }

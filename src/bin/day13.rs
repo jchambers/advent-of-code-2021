@@ -1,5 +1,6 @@
 use crate::Fold::{Horizontal, Vertical};
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::BufRead;
 use std::str::FromStr;
@@ -9,13 +10,31 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let (page, folds) = load_page_and_folds(
-            io::BufReader::new(File::open(path)?)
-                .lines()
-                .filter_map(|line| line.ok()),
-        );
+        {
+            let (page, folds) = load_page_and_folds(
+                io::BufReader::new(File::open(path)?)
+                    .lines()
+                    .filter_map(|line| line.ok()),
+            );
 
-        println!("Dots visible after first fold: {}", page.apply_fold(&folds[0]).distinct_points());
+            println!(
+                "Dots visible after first fold: {}",
+                page.apply_fold(&folds[0]).distinct_points()
+            );
+        }
+
+        {
+            let (page, folds) = load_page_and_folds(
+                io::BufReader::new(File::open(path)?)
+                    .lines()
+                    .filter_map(|line| line.ok()),
+            );
+
+            println!(
+                "Page after applying all folds:\n{}",
+                page.apply_folds(&folds)
+            );
+        }
 
         Ok(())
     } else {
@@ -66,30 +85,46 @@ struct TransparentPage {
 }
 
 impl TransparentPage {
-    pub fn apply_fold(self, fold: &Fold) -> Self {
+    pub fn apply_folds(self, folds: &[Fold]) -> Self {
+        let mut page = self;
+
+        for fold in folds {
+            page = page.apply_fold(fold);
+        }
+
+        page
+    }
+
+    fn apply_fold(self, fold: &Fold) -> Self {
         let points = match fold {
-            Horizontal(y) => {
-                self.points.iter()
-                    .map(|point| {
-                        if point.y > *y {
-                            Point { x: point.x, y: y - (point.y - y) }
-                        } else {
-                            point.clone()
+            Horizontal(y) => self
+                .points
+                .iter()
+                .map(|point| {
+                    if point.y > *y {
+                        Point {
+                            x: point.x,
+                            y: y - (point.y - y),
                         }
-                    })
-                    .collect()
-            },
-            Vertical(x) => {
-                self.points.iter()
-                    .map(|point| {
-                        if point.x > *x {
-                            Point { x: x - (point.x - x), y: point.y }
-                        } else {
-                            point.clone()
+                    } else {
+                        point.clone()
+                    }
+                })
+                .collect(),
+            Vertical(x) => self
+                .points
+                .iter()
+                .map(|point| {
+                    if point.x > *x {
+                        Point {
+                            x: x - (point.x - x),
+                            y: point.y,
                         }
-                    })
-                    .collect()
-            },
+                    } else {
+                        point.clone()
+                    }
+                })
+                .collect(),
         };
 
         TransparentPage { points }
@@ -97,6 +132,28 @@ impl TransparentPage {
 
     pub fn distinct_points(&self) -> u32 {
         self.points.len() as u32
+    }
+}
+
+impl Display for TransparentPage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let max_x = self.points.iter().map(|point| point.x).max().unwrap_or(0);
+
+        let max_y = self.points.iter().map(|point| point.y).max().unwrap_or(0);
+
+        for y in 0..=max_y {
+            for x in 0..=max_x {
+                if self.points.contains(&Point { x, y }) {
+                    write!(f, "#")?;
+                } else {
+                    write!(f, ".")?;
+                }
+            }
+
+            write!(f, "\n")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -195,12 +252,25 @@ mod test {
         let (page, folds) = load_page_and_folds(
             TEST_PAGE_AND_FOLDS_STRING
                 .lines()
-                .map(|line| String::from(line)));
+                .map(|line| String::from(line)),
+        );
 
         let after_first_fold = page.apply_fold(&folds[0]);
         assert_eq!(17, after_first_fold.distinct_points());
 
         let after_second_fold = after_first_fold.apply_fold(&folds[1]);
         assert_eq!(16, after_second_fold.distinct_points());
+    }
+
+    #[test]
+    fn test_apply_folds() {
+        let (page, folds) = load_page_and_folds(
+            TEST_PAGE_AND_FOLDS_STRING
+                .lines()
+                .map(|line| String::from(line)),
+        );
+
+        let page = page.apply_folds(&folds);
+        assert_eq!(16, page.distinct_points());
     }
 }

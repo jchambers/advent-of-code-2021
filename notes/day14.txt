@@ -1,0 +1,66 @@
+CH -> B
+HH -> N
+CB -> H
+NH -> C
+HB -> C
+HC -> B
+HN -> C
+NN -> C
+BH -> H
+NC -> B
+NB -> B
+BN -> B
+BB -> N
+BC -> B
+CC -> N
+CN -> C
+
+    B  C  H  N
+  +-----------
+B | N  B  H  B
+C | H  N  B  C
+H | C  B  N  C
+N | B  B  C  C
+
+B: 6
+C: 5
+H: 2
+N: 3
+
+
+N       N       C       B
+    C       B       H
+  B   C   B   B   B   C
+
+
+B: 1, C: 1, H: 0, N: 2 | NNCB
+B: 2, C: 2, H: 1, N: 2 | NCNBCHB
+B: 0, C: 0, H: 0, N: 0 | NBCCNBBBCBHCB
+B: 0, C: 0, H: 0, N: 0 | NBBBCNCCNBBNBNBBCHBHHBCHB
+B: 0, C: 0, H: 0, N: 0 | NBBNBNBBCCNBCNCCNBBNBBNBBBNBBNBBCBHCBHHNHCBBCBHCB
+
+Waaaaaaait a second; is the thing we actually want to count at each level the incidence of each
+rule?
+
+NNCB => NN, NC, CB
+
+…so NN will deterministically spawn (NC, CN); NC will spawn (NB, BC); CB will spawn (CH, HB). From
+that alone, we'd expect:
+
+NC: 1
+CN: 1
+NB: 1
+BC: 1
+CH: 1
+HB: 1
+
+And from the example, we know that we're expecting: NCNBCHB, which breaks down to:
+
+NC: 1
+CN: 1
+NB: 1
+BC: 1
+CH: 1
+HB: 1
+
+…and that seems to be the trick right there.

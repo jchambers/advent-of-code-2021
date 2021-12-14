@@ -88,16 +88,14 @@ impl HeightMap {
         queue.push_front((origin_row, origin_col));
 
         while let Some((row, col)) = queue.pop_front() {
-            if explored.insert((row, col)) {
-                if self.heights[row][col] < 9 {
-                    basin_members.push((row, col));
+            if explored.insert((row, col)) && self.heights[row][col] < 9 {
+                basin_members.push((row, col));
 
-                    queue.extend(self.get_neighbors(row, col).iter().filter(
-                        |&&(neighbor_row, neighbor_col)| {
-                            !explored.contains(&(neighbor_row, neighbor_col))
-                        },
-                    ));
-                }
+                queue.extend(self.get_neighbors(row, col).iter().filter(
+                    |&&(neighbor_row, neighbor_col)| {
+                        !explored.contains(&(neighbor_row, neighbor_col))
+                    },
+                ));
             }
         }
 
@@ -123,7 +121,7 @@ impl FromStr for HeightMap {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let heights = s
             .lines()
-            .map(|line| line.chars().map(|c| c as u8 - '0' as u8).collect())
+            .map(|line| line.chars().map(|c| c as u8 - b'0').collect())
             .collect();
 
         Ok(HeightMap { heights })

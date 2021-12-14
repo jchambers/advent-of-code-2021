@@ -101,7 +101,7 @@ fn get_life_support_value(
         let filtered_values: Vec<String> = values
             .iter()
             .filter(|value| value.chars().nth(position) == Some(target_digit))
-            .map(|value| value.clone())
+            .cloned()
             .collect();
 
         get_life_support_value(&filtered_values, position + 1, get_target_digit)

@@ -70,7 +70,7 @@ impl TryFrom<&str> for Command {
     type Error = &'static str;
 
     fn try_from(command: &str) -> Result<Self, Self::Error> {
-        let pieces: Vec<&str> = command.split(" ").collect();
+        let pieces: Vec<&str> = command.split(' ').collect();
 
         if pieces.len() != 2 {
             return Err("Expected 2 pieces".into());

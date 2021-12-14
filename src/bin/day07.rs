@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     if let Some(path) = args.get(1) {
         let positions: Vec<u32> = io::BufReader::new(File::open(path)?)
-            .split(',' as u8)
+            .split(b',')
             .map(|chunk| String::from_utf8(chunk.unwrap()).unwrap())
             .map(|position| u32::from_str(position.as_str()).unwrap())
             .collect();

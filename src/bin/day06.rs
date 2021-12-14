@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     if let Some(path) = args.get(1) {
         let respawn_times: Vec<u8> = io::BufReader::new(File::open(path)?)
-            .split(',' as u8)
+            .split(b',')
             .map(|chunk| String::from_utf8(chunk.unwrap()).unwrap())
             .map(|respawn_time| u8::from_str(respawn_time.as_str()).unwrap())
             .collect();

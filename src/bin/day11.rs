@@ -66,15 +66,12 @@ impl OctopusGrid {
 
             for row in 0..10 {
                 for col in 0..10 {
-                    if self.energy_levels[row][col] > 9 {
-                        if flashed.insert((row, col)) {
-                            // This octopus just crossed the energy threshold and hasn't already
-                            // flashed
-                            converged = false;
+                    if self.energy_levels[row][col] > 9 && flashed.insert((row, col)) {
+                        // This octopus just crossed the energy threshold and hasn't already flashed
+                        converged = false;
 
-                            for (neighbor_row, neighbor_col) in Self::neighbors(row, col) {
-                                self.energy_levels[neighbor_row][neighbor_col] += 1;
-                            }
+                        for (neighbor_row, neighbor_col) in Self::neighbors(row, col) {
+                            self.energy_levels[neighbor_row][neighbor_col] += 1;
                         }
                     }
                 }
@@ -124,7 +121,7 @@ impl FromStr for OctopusGrid {
             .lines()
             .map(|line| {
                 line.chars()
-                    .map(|c| c as u8 - '0' as u8)
+                    .map(|c| c as u8 - b'0')
                     .collect::<Vec<u8>>()
                     .try_into()
                     .unwrap()

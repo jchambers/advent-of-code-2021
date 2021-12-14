@@ -75,7 +75,7 @@ impl CaveGraph {
         cave_id.chars().all(|c| c.is_uppercase())
     }
 
-    fn allow_visit(cave: &str, path: &Vec<&str>, allow_small_cave_revisit: bool) -> bool {
+    fn allow_visit(cave: &str, path: &[&str], allow_small_cave_revisit: bool) -> bool {
         if Self::is_big_cave(cave) {
             true
         } else if cave == "start" {
@@ -107,18 +107,18 @@ impl FromStr for CaveGraph {
         string
             .lines()
             .map(|line| {
-                let mut pieces = line.split("-");
+                let mut pieces = line.split('-');
                 (pieces.next().unwrap(), pieces.next().unwrap())
             })
             .for_each(|(origin, destination)| {
                 connections
                     .entry(String::from(origin))
-                    .or_insert_with(|| HashSet::new())
+                    .or_insert_with(HashSet::new)
                     .insert(String::from(destination));
 
                 connections
                     .entry(String::from(destination))
-                    .or_insert_with(|| HashSet::new())
+                    .or_insert_with(HashSet::new)
                     .insert(String::from(origin));
             });
 

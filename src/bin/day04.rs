@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         let selections: Vec<u8> = lines
             .next()
             .unwrap()?
-            .split(",")
+            .split(',')
             .filter_map(|n| n.parse().ok())
             .collect();
 
@@ -129,7 +129,7 @@ impl BingoBoard {
     pub fn unmarked_cell_sum(&self) -> u32 {
         self.cells
             .iter()
-            .flat_map(|row| row)
+            .flatten()
             .map(|cell| match cell {
                 Unmarked(number) => *number as u32,
                 _ => 0,

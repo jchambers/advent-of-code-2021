@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
             segments.iter()
                 .filter(|segment| segment.is_horizontal() || segment.is_vertical())
-                .for_each(|segment| vent_map.add_line_segment(&segment));
+                .for_each(|segment| vent_map.add_line_segment(segment));
 
             println!(
                 "Cells with multiple vents (horizontal/vertical only): {}",
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             let mut vent_map = VentMap::new();
 
             segments.iter()
-                .for_each(|segment| vent_map.add_line_segment(&segment));
+                .for_each(|segment| vent_map.add_line_segment(segment));
 
             println!(
                 "Cells with multiple vents (all): {}",
@@ -55,7 +55,7 @@ impl FromStr for Point {
     type Err = Box<dyn std::error::Error>;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let pieces: Vec<&str> = value.split(",").collect();
+        let pieces: Vec<&str> = value.split(',').collect();
 
         if pieces.len() != 2 {
             return Err("Points must have two comma-separated coordinates".into());

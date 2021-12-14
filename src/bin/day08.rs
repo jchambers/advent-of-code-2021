@@ -158,16 +158,14 @@ impl SevenDigitDisplay {
         // '1'. We can also figure out which of the segments in the '1' isn't already in the map.
         {
             let one_chars: HashSet<char> = scrambled_digits.iter()
-                .filter(|segment_group| segment_group.len() == 2)
-                .next()
+                .find(|segment_group| segment_group.len() == 2)
                 .unwrap()
                 .clone()
                 .into_iter()
                 .collect();
 
             let seven_chars: HashSet<char> = scrambled_digits.iter()
-                .filter(|segment_group| segment_group.len() == 3)
-                .next()
+                .find(|segment_group| segment_group.len() == 3)
                 .unwrap()
                 .clone()
                 .into_iter()
@@ -237,7 +235,7 @@ impl SevenDigitDisplay {
             .map(|character| *self.positions_by_character.get(character).unwrap())
             .collect();
 
-        lit_positions.sort();
+        lit_positions.sort_unstable();
 
         for digit in 0..=9 {
             if lit_positions == Self::get_lit_segments(digit) {

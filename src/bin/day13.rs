@@ -59,7 +59,7 @@ impl FromStr for Point {
     type Err = Box<dyn error::Error>;
 
     fn from_str(line: &str) -> Result<Self, Self::Err> {
-        let mut pieces = line.split(",");
+        let mut pieces = line.split(',');
 
         Ok(Point {
             x: u32::from_str(pieces.next().unwrap())?,
@@ -93,14 +93,14 @@ impl TransparentPage {
                         if point.y > *y {
                             Point { x: point.x, y: y - (point.y - y) }
                         } else {
-                            point.clone()
+                            *point
                         }
                     }
                     Vertical(x) => {
                         if point.x > *x {
                             Point { x: x - (point.x - x), y: point.y }
                         } else {
-                            point.clone()
+                            *point
                         }
                     }
                 }
@@ -129,7 +129,7 @@ impl Display for TransparentPage {
                 }
             }
 
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
 
         Ok(())

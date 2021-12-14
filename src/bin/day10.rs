@@ -56,7 +56,7 @@ fn analyze_line(line: &str) -> Result<(), NavigationSyntaxError> {
         };
     }
 
-    if let Some(_) = stack.front() {
+    if stack.front().is_some() {
         let mut expected = String::new();
 
         while let Some(opener) = stack.pop_front() {
@@ -126,7 +126,7 @@ fn median_autocomplete_score(lines: impl Iterator<Item = String>) -> u64 {
         .filter(|&score| score > 0)
         .collect();
 
-    scores.sort();
+    scores.sort_unstable();
 
     scores[scores.len() / 2]
 }

@@ -43,9 +43,9 @@ impl Polymerizer {
 
         let mut counts_by_pair = HashMap::new();
 
-        for i in 0..self.template.len() - 1 {
+        for pair in self.template.windows(2) {
             *counts_by_pair
-                .entry([self.template[i], self.template[i + 1]])
+                .entry(pair.try_into().unwrap())
                 .or_insert(0) += 1;
         }
 

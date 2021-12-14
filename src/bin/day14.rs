@@ -57,8 +57,8 @@ impl Polymerizer {
                 *counts_by_element.entry(*self.rules.get(&pair).unwrap()).or_insert(0) += count;
 
                 // …and every pair "splits" into two child pairs.
-                for advanced_pair in self.advance_pair(pair) {
-                    *next_generation.entry(advanced_pair).or_insert(0) += count;
+                for child_pair in self.split_pair(pair) {
+                    *next_generation.entry(child_pair).or_insert(0) += count;
                 }
             }
 
@@ -68,7 +68,10 @@ impl Polymerizer {
         counts_by_element
     }
 
-    fn advance_pair(&self, pair: ElementPair) -> [ElementPair; 2] {
+    // Pairs insert a new atom in the middle, which effectively "splits" the pair into two new pairs
+    // in the next generation; e.g. if "AB -> C", then we wind up with "AC" and "CB" in the next
+    // generation.
+    fn split_pair(&self, pair: ElementPair) -> [ElementPair; 2] {
         let inserted_element = *self.rules.get(&pair).unwrap();
 
         [[pair[0], inserted_element], [inserted_element, pair[1]]]
@@ -169,12 +172,12 @@ mod test {
     }
 
     #[test]
-    fn test_advance_pair() {
+    fn test_split_pair() {
         let polymerizer = Polymerizer::from_str(TEST_POLYMERIZER_STRING).unwrap();
 
         assert_eq!(
             [['C', 'B'], ['B', 'H']],
-            polymerizer.advance_pair(['C', 'H'])
+            polymerizer.split_pair(['C', 'H'])
         );
     }
 

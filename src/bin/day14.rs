@@ -6,13 +6,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let mut polymerizer = Polymerizer::from_str(std::fs::read_to_string(path)?.as_str()).unwrap();
+        let polymerizer = Polymerizer::from_str(std::fs::read_to_string(path)?.as_str()).unwrap();
 
-        for _ in 0..10 {
-            polymerizer = polymerizer.advance();
-        }
-
-        println!("Element spread after 10 steps: {}", polymerizer.element_spread());
+        println!("Element spread after 10 generations: {}", polymerizer.element_spread(10));
+        println!("Element spread after 40 generations: {}", polymerizer.element_spread(40));
 
         Ok(())
     } else {
@@ -20,37 +17,61 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
+type ElementPair = [char; 2];
+
 #[derive(Debug, Eq, PartialEq)]
 struct Polymerizer {
-    template: String,
-    rules: HashMap<String, String>,
+    template: Vec<char>,
+    rules: HashMap<ElementPair, char>,
 }
 
 impl Polymerizer {
-    pub fn advance(self) -> Self {
-        let mut template = String::new();
+    pub fn element_spread(&self, generation: u32) -> u64 {
+        let element_counts = self.element_counts(generation);
 
-        for i in 0..self.template.len() - 1 {
-            template.push_str(&self.template[i..i + 1]);
-            template.push_str(self.rules.get(&self.template[i..=i + 1]).unwrap());
-        }
-
-        template.push_str(&self.template[self.template.len() - 1..]);
-
-        Polymerizer {
-            template,
-            rules: self.rules
-        }
+        element_counts.values().max().unwrap_or(&0u64) -
+            element_counts.values().min().unwrap_or(&0u64)
     }
 
-    pub fn element_spread(&self) -> u32 {
-        let counts_by_element = self.template.chars()
-            .fold(HashMap::new(), |mut counts, c| {
-                *counts.entry(c).or_insert(0) += 1;
-                counts
-            });
+    fn element_counts(&self, generation: u32) -> HashMap<char, u64> {
+        let mut counts_by_element = HashMap::new();
 
-        counts_by_element.values().max().unwrap() - counts_by_element.values().min().unwrap()
+        // Start off the element count with what's already in the template
+        for &c in &self.template {
+            *counts_by_element.entry(c).or_insert(0) += 1;
+        }
+
+        let mut counts_by_pair = HashMap::new();
+
+        for i in 0..self.template.len() - 1 {
+            *counts_by_pair
+                .entry([self.template[i], self.template[i + 1]])
+                .or_insert(0) += 1;
+        }
+
+        for _ in 0..generation {
+            let mut next_generation = HashMap::new();
+
+            for (pair, count) in counts_by_pair {
+                // Every pair spawns exactly one new atom in the next generation…
+                *counts_by_element.entry(*self.rules.get(&pair).unwrap()).or_insert(0) += count;
+
+                // …and every pair "splits" into two child pairs.
+                for advanced_pair in self.advance_pair(pair) {
+                    *next_generation.entry(advanced_pair).or_insert(0) += count;
+                }
+            }
+
+            counts_by_pair = next_generation;
+        }
+
+        counts_by_element
+    }
+
+    fn advance_pair(&self, pair: ElementPair) -> [ElementPair; 2] {
+        let inserted_element = *self.rules.get(&pair).unwrap();
+
+        [[pair[0], inserted_element], [inserted_element, pair[1]]]
     }
 }
 
@@ -60,17 +81,24 @@ impl FromStr for Polymerizer {
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         let mut lines = string.lines();
 
-        let template = String::from(lines.next().unwrap());
+        let template = lines.next().unwrap().chars().collect();
 
-        let rules: HashMap<String, String> = lines
+        let rules: HashMap<ElementPair, char> = lines
             .filter(|line| !line.is_empty())
             .map(|line| {
                 let mut components = line.split(" -> ");
 
-                (
-                    String::from(components.next().unwrap()),
-                    String::from(components.next().unwrap()),
-                )
+                let pair: ElementPair = components
+                    .next()
+                    .unwrap()
+                    .chars()
+                    .collect::<Vec<char>>()
+                    .try_into()
+                    .unwrap();
+
+                let element = components.next().unwrap().chars().next().unwrap();
+
+                (pair, element)
             })
             .collect();
 
@@ -108,60 +136,64 @@ mod test {
     fn test_polymerizer_from_string() {
         let expected = {
             let rules = vec![
-                (String::from("CH"), String::from("B")),
-                (String::from("HH"), String::from("N")),
-                (String::from("CB"), String::from("H")),
-                (String::from("NH"), String::from("C")),
-                (String::from("HB"), String::from("C")),
-                (String::from("HC"), String::from("B")),
-                (String::from("HN"), String::from("C")),
-                (String::from("NN"), String::from("C")),
-                (String::from("BH"), String::from("H")),
-                (String::from("NC"), String::from("B")),
-                (String::from("NB"), String::from("B")),
-                (String::from("BN"), String::from("B")),
-                (String::from("BB"), String::from("N")),
-                (String::from("BC"), String::from("B")),
-                (String::from("CC"), String::from("N")),
-                (String::from("CN"), String::from("C")),
+                (['C', 'H'], 'B'),
+                (['H', 'H'], 'N'),
+                (['C', 'B'], 'H'),
+                (['N', 'H'], 'C'),
+                (['H', 'B'], 'C'),
+                (['H', 'C'], 'B'),
+                (['H', 'N'], 'C'),
+                (['N', 'N'], 'C'),
+                (['B', 'H'], 'H'),
+                (['N', 'C'], 'B'),
+                (['N', 'B'], 'B'),
+                (['B', 'N'], 'B'),
+                (['B', 'B'], 'N'),
+                (['B', 'C'], 'B'),
+                (['C', 'C'], 'N'),
+                (['C', 'N'], 'C'),
             ]
             .into_iter()
             .collect();
 
             Polymerizer {
-                template: String::from("NNCB"),
+                template: vec!['N', 'N', 'C', 'B'],
                 rules,
             }
         };
 
-        assert_eq!(expected, Polymerizer::from_str(TEST_POLYMERIZER_STRING).unwrap());
+        assert_eq!(
+            expected,
+            Polymerizer::from_str(TEST_POLYMERIZER_STRING).unwrap()
+        );
     }
 
     #[test]
-    fn test_advance() {
+    fn test_advance_pair() {
         let polymerizer = Polymerizer::from_str(TEST_POLYMERIZER_STRING).unwrap();
 
-        let polymerizer = polymerizer.advance();
-        assert_eq!(String::from("NCNBCHB"), polymerizer.template);
+        assert_eq!(
+            [['C', 'B'], ['B', 'H']],
+            polymerizer.advance_pair(['C', 'H'])
+        );
+    }
 
-        let polymerizer = polymerizer.advance();
-        assert_eq!(String::from("NBCCNBBBCBHCB"), polymerizer.template);
+    #[test]
+    fn test_element_counts() {
+        let expected: HashMap<char, u64> = vec![('B', 1749), ('C', 298), ('H', 161), ('N', 865)]
+            .into_iter()
+            .collect();
 
-        let polymerizer = polymerizer.advance();
-        assert_eq!(String::from("NBBBCNCCNBBNBNBBCHBHHBCHB"), polymerizer.template);
+        let polymerizer = Polymerizer::from_str(TEST_POLYMERIZER_STRING).unwrap();
 
-        let polymerizer = polymerizer.advance();
-        assert_eq!(String::from("NBBNBNBBCCNBCNCCNBBNBBNBBBNBBNBBCBHCBHHNHCBBCBHCB"), polymerizer.template);
+        assert_eq!(expected, polymerizer.element_counts(10));
     }
 
     #[test]
     fn test_element_spread() {
-        let mut polymerizer = Polymerizer::from_str(TEST_POLYMERIZER_STRING).unwrap();
+        let polymerizer = Polymerizer::from_str(TEST_POLYMERIZER_STRING).unwrap();
 
-        for _ in 0..10 {
-            polymerizer = polymerizer.advance();
-        }
-
-        assert_eq!(1588, polymerizer.element_spread());
+        assert_eq!(1588, polymerizer.element_spread(10));
+        assert_eq!(2188189693529, polymerizer.element_spread(40));
     }
 }

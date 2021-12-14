@@ -41,7 +41,7 @@ impl Polymerizer {
             *counts_by_element.entry(c).or_insert(0) += 1;
         }
 
-        let mut counts_by_pair = HashMap::new();
+        let mut counts_by_pair: HashMap<ElementPair, u64> = HashMap::new();
 
         for pair in self.template.windows(2) {
             *counts_by_pair

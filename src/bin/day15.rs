@@ -125,10 +125,17 @@ struct NodeAndDistance {
     position: RowCol,
 }
 
+impl NodeAndDistance {
+    fn index(&self) -> u64 {
+        ((self.position.0 as u64) << 32) | (self.position.1 as u64)
+    }
+}
+
 impl Ord for NodeAndDistance {
     fn cmp(&self, other: &Self) -> Ordering {
         // Swap the "normal" order so we have a min-first heap
         other.distance.cmp(&self.distance)
+            .then_with(|| self.index().cmp(&other.index()))
     }
 }
 

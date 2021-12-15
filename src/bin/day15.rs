@@ -1,5 +1,5 @@
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashSet};
 use std::str::FromStr;
 use std::{env, error};
 
@@ -9,7 +9,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     if let Some(path) = args.get(1) {
         let cave_map = CaveMap::from_str(std::fs::read_to_string(path)?.as_str()).unwrap();
 
-        println!("Total risk score along path to exit: {}", cave_map.path_risk_to_exit());
+        println!(
+            "Total risk score along path to exit: {}",
+            cave_map.path_risk_to_exit()
+        );
 
         Ok(())
     } else {
@@ -24,42 +27,43 @@ struct CaveMap {
 impl CaveMap {
     pub fn path_risk_to_exit(&self) -> u32 {
         let mut visited_nodes = HashSet::new();
-        let mut distances: HashMap<(usize, usize), u32> = HashMap::new();
+        let mut tentative_distances = BinaryHeap::new();
 
-        distances.insert((0, 0), 0);
+        tentative_distances.push(NodeAndDistance::new((0, 0), 0, self.risk_scores.len()));
 
         let exit = (
             self.risk_scores.len() - 1,
             self.risk_scores.last().unwrap().len() - 1,
         );
 
-        while !visited_nodes.contains(&exit) {
-            // Find the position of and best distance to the closest unexplored node
-            // TODO This would be better with a priority queue
-            let (&(row, col), &distance) = distances
-                .iter()
-                .filter(|&(position, _)| !visited_nodes.contains(position))
-                .min_by(|(_, distance_a), (_, distance_b)| distance_a.cmp(distance_b))
-                .unwrap();
+        while let Some(node_and_distance) = tentative_distances.pop() {
+            if visited_nodes.contains(&(node_and_distance.row, node_and_distance.col)) {
+                continue;
+            }
+
+            if (node_and_distance.row, node_and_distance.col) == exit {
+                return node_and_distance.distance;
+            }
 
             // Update the tentative distance to each unvisited neighbor
-            self.neighbors(row, col)
+            self.neighbors(node_and_distance.row, node_and_distance.col)
                 .iter()
                 .filter(|&neighbor| !visited_nodes.contains(neighbor))
                 .for_each(|&(neighbor_row, neighbor_col)| {
-                    let distance_through_current_node =
-                        self.risk_scores[neighbor_row][neighbor_col] as u32 + distance;
+                    let tentative_distance = self.risk_scores[neighbor_row][neighbor_col] as u32
+                        + node_and_distance.distance;
 
-                    distances
-                        .entry((neighbor_row, neighbor_col))
-                        .and_modify(|d| *d = min(*d, distance_through_current_node))
-                        .or_insert(distance + self.risk_scores[neighbor_row][neighbor_col] as u32);
+                    tentative_distances.push(NodeAndDistance::new(
+                        (neighbor_row, neighbor_col),
+                        tentative_distance,
+                        self.risk_scores.len(),
+                    ));
                 });
 
-            visited_nodes.insert((row, col));
+            visited_nodes.insert((node_and_distance.row, node_and_distance.col));
         }
 
-        *distances.get(&exit).unwrap_or(&0u32)
+        u32::MAX
     }
 
     fn neighbors(&self, row: usize, col: usize) -> Vec<(usize, usize)> {
@@ -82,6 +86,51 @@ impl CaveMap {
         }
 
         neighbors
+    }
+}
+
+#[derive(Eq, PartialEq)]
+struct NodeAndDistance {
+    distance: u32,
+    row: usize,
+    col: usize,
+
+    // Borrowing from https://doc.rust-lang.org/std/collections/binary_heap/index.html, we need this
+    // as a tie-breaker if two nodes have the same distance. We'll call "position" the array index
+    // as if all of the nodes were laid out in a one-dimensional array, so this is
+    // `row * ROW_WIDTH + col`.
+    position: usize,
+}
+
+impl NodeAndDistance {
+    pub fn new(position: (usize, usize), distance: u32, row_width: usize) -> Self {
+        let (row, col) = position;
+
+        Self {
+            distance,
+            row,
+            col,
+            position: (row * row_width) + col,
+        }
+    }
+}
+
+impl Ord for NodeAndDistance {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // We want two things that are slightly different from the default:
+        //
+        // 1. We want min-first ordering
+        // 2. We want to be able to break ties with position
+        other
+            .distance
+            .cmp(&self.distance)
+            .then_with(|| self.position.cmp(&other.position))
+    }
+}
+
+impl PartialOrd for NodeAndDistance {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

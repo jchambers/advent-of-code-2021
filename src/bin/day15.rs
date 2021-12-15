@@ -29,7 +29,11 @@ impl CaveMap {
         let mut visited_nodes = HashSet::new();
         let mut tentative_distances = BinaryHeap::new();
 
-        tentative_distances.push(NodeAndDistance::new((0, 0), 0, self.risk_scores.len()));
+        tentative_distances.push(NodeAndDistance {
+            distance: 0,
+            row: 0,
+            col: 0
+        });
 
         let exit = (
             self.risk_scores.len() - 1,
@@ -53,11 +57,11 @@ impl CaveMap {
                     let tentative_distance = self.risk_scores[neighbor_row][neighbor_col] as u32
                         + node_and_distance.distance;
 
-                    tentative_distances.push(NodeAndDistance::new(
-                        (neighbor_row, neighbor_col),
-                        tentative_distance,
-                        self.risk_scores.len(),
-                    ));
+                    tentative_distances.push(NodeAndDistance {
+                        row: neighbor_row,
+                        col: neighbor_col,
+                        distance: tentative_distance
+                    });
                 });
 
             visited_nodes.insert((node_and_distance.row, node_and_distance.col));
@@ -93,38 +97,13 @@ impl CaveMap {
 struct NodeAndDistance {
     distance: u32,
     row: usize,
-    col: usize,
-
-    // Borrowing from https://doc.rust-lang.org/std/collections/binary_heap/index.html, we need this
-    // as a tie-breaker if two nodes have the same distance. We'll call "position" the array index
-    // as if all of the nodes were laid out in a one-dimensional array, so this is
-    // `row * ROW_WIDTH + col`.
-    position: usize,
-}
-
-impl NodeAndDistance {
-    pub fn new(position: (usize, usize), distance: u32, row_width: usize) -> Self {
-        let (row, col) = position;
-
-        Self {
-            distance,
-            row,
-            col,
-            position: (row * row_width) + col,
-        }
-    }
+    col: usize
 }
 
 impl Ord for NodeAndDistance {
     fn cmp(&self, other: &Self) -> Ordering {
-        // We want two things that are slightly different from the default:
-        //
-        // 1. We want min-first ordering
-        // 2. We want to be able to break ties with position
-        other
-            .distance
-            .cmp(&self.distance)
-            .then_with(|| self.position.cmp(&other.position))
+        // Swap the "normal" order so we have a min-first heap
+        other.distance.cmp(&self.distance)
     }
 }
 

@@ -31,46 +31,46 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
+type RowCol = (usize, usize);
+
 struct CaveMap {
     risk_scores: Vec<Vec<u8>>,
 }
 
 impl CaveMap {
-    pub fn path_risk_to_exit(&self, exit: (usize, usize)) -> u32 {
+    pub fn path_risk_to_exit(&self, exit: RowCol) -> u32 {
         let mut visited_nodes = HashSet::new();
         let mut tentative_distances = BinaryHeap::new();
 
         tentative_distances.push(NodeAndDistance {
             distance: 0,
-            row: 0,
-            col: 0,
+            position: (0, 0)
         });
 
         while let Some(node_and_distance) = tentative_distances.pop() {
-            if visited_nodes.contains(&(node_and_distance.row, node_and_distance.col)) {
+            if visited_nodes.contains(&(node_and_distance.position)) {
                 continue;
             }
 
-            if (node_and_distance.row, node_and_distance.col) == exit {
+            if node_and_distance.position == exit {
                 return node_and_distance.distance;
             }
 
             // Update the tentative distance to each unvisited neighbor
-            self.neighbors(node_and_distance.row, node_and_distance.col, exit.0, exit.1)
+            self.neighbors(node_and_distance.position, exit.0, exit.1)
                 .iter()
                 .filter(|&neighbor| !visited_nodes.contains(neighbor))
-                .for_each(|&(neighbor_row, neighbor_col)| {
+                .for_each(|&neighbor| {
                     let tentative_distance =
-                        self.risk_score(neighbor_row, neighbor_col) + node_and_distance.distance;
+                        self.risk_score(neighbor) + node_and_distance.distance;
 
                     tentative_distances.push(NodeAndDistance {
-                        row: neighbor_row,
-                        col: neighbor_col,
                         distance: tentative_distance,
+                        position: neighbor
                     });
                 });
 
-            visited_nodes.insert((node_and_distance.row, node_and_distance.col));
+            visited_nodes.insert(node_and_distance.position);
         }
 
         u32::MAX
@@ -78,12 +78,13 @@ impl CaveMap {
 
     fn neighbors(
         &self,
-        row: usize,
-        col: usize,
+        position: RowCol,
         max_row: usize,
         max_col: usize,
     ) -> Vec<(usize, usize)> {
         let mut neighbors = Vec::new();
+
+        let (row, col) = position;
 
         if row > 0 {
             neighbors.push((row - 1, col));
@@ -104,7 +105,9 @@ impl CaveMap {
         neighbors
     }
 
-    fn risk_score(&self, row: usize, col: usize) -> u32 {
+    fn risk_score(&self, position: RowCol) -> u32 {
+        let (row, col) = position;
+
         let row_within_tile = row % self.risk_scores.len();
         let col_within_tile = col % self.risk_scores[row_within_tile].len();
 
@@ -119,8 +122,7 @@ impl CaveMap {
 #[derive(Eq, PartialEq)]
 struct NodeAndDistance {
     distance: u32,
-    row: usize,
-    col: usize,
+    position: RowCol,
 }
 
 impl Ord for NodeAndDistance {
@@ -179,16 +181,16 @@ mod test {
     fn test_risk_score() {
         let cave_map = CaveMap::from_str(TEST_MAP_STRING).unwrap();
 
-        assert_eq!(1, cave_map.risk_score(0, 0));
-        assert_eq!(2, cave_map.risk_score(0, 10));
-        assert_eq!(2, cave_map.risk_score(10, 0));
-        assert_eq!(3, cave_map.risk_score(10, 10));
+        assert_eq!(1, cave_map.risk_score((0, 0)));
+        assert_eq!(2, cave_map.risk_score((0, 10)));
+        assert_eq!(2, cave_map.risk_score((10, 0)));
+        assert_eq!(3, cave_map.risk_score((10, 10)));
 
-        assert_eq!(9, cave_map.risk_score(9, 4));
-        assert_eq!(1, cave_map.risk_score(19, 4));
-        assert_eq!(1, cave_map.risk_score(9, 14));
-        assert_eq!(2, cave_map.risk_score(19, 14));
+        assert_eq!(9, cave_map.risk_score((9, 4)));
+        assert_eq!(1, cave_map.risk_score((19, 4)));
+        assert_eq!(1, cave_map.risk_score((9, 14)));
+        assert_eq!(2, cave_map.risk_score((19, 14)));
 
-        assert_eq!(9, cave_map.risk_score(49, 49));
+        assert_eq!(9, cave_map.risk_score((49, 49)));
     }
 }

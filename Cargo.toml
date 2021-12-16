@@ -42,7 +42,17 @@ name = "day12"
 [[bin]]
 name = "day13"
 
+[[bin]]
+name = "day14"
+
+[[bin]]
+name = "day15"
+
+[[bin]]
+name = "day16"
+
 [dependencies]
+hex = "0.4.3"
 
 [dev-dependencies]
 indoc = "1.0"

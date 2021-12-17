@@ -6,10 +6,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let mut bit_stream = BitStream::from_hex(std::fs::read_to_string(path)?.as_str())?;
-        let packet = Packet::next_from_bit_stream(&mut bit_stream);
+        let packet = Packet::from_hex(std::fs::read_to_string(path)?.as_str());
 
         println!("Version sum: {}", packet.version_sum());
+        println!("Evaluated: {}", packet.eval());
 
         Ok(())
     } else {
@@ -120,6 +120,67 @@ impl Packet {
                         .iter()
                         .map(|sub_packet| sub_packet.version_sum())
                         .sum::<u32>()
+            }
+        }
+    }
+
+    pub fn eval(&self) -> u64 {
+        match self {
+            Packet::Literal { header: _, value} => *value,
+            Operator { header, sub_packets } => {
+                match header.type_id {
+                    0 => {
+                        // Add
+                        sub_packets.iter()
+                            .map(|sub_packet| sub_packet.eval())
+                            .sum()
+                    },
+                    1 => {
+                        // Product
+                        sub_packets.iter()
+                            .map(|sub_packet| sub_packet.eval())
+                            .product()
+                    },
+                    2 => {
+                        // Min
+                        sub_packets.iter()
+                            .map(|sub_packet| sub_packet.eval())
+                            .min()
+                            .unwrap()
+                    },
+                    3 => {
+                        // Max
+                        sub_packets.iter()
+                            .map(|sub_packet| sub_packet.eval())
+                            .max()
+                            .unwrap()
+                    },
+                    5 => {
+                        // Greater than
+                        if sub_packets[0].eval() > sub_packets[1].eval() {
+                            1
+                        } else {
+                            0
+                        }
+                    },
+                    6 => {
+                        // Less than
+                        if sub_packets[0].eval() < sub_packets[1].eval() {
+                            1
+                        } else {
+                            0
+                        }
+                    },
+                    7 => {
+                        // Equal to
+                        if sub_packets[0].eval() == sub_packets[1].eval() {
+                            1
+                        } else {
+                            0
+                        }
+                    },
+                    _ => unreachable!()
+                }
             }
         }
     }
@@ -296,5 +357,17 @@ mod test {
         assert_eq!(12, Packet::from_hex("620080001611562C8802118E34").version_sum());
         assert_eq!(23, Packet::from_hex("C0015000016115A2E0802F182340").version_sum());
         assert_eq!(31, Packet::from_hex("A0016C880162017C3686B18A3D4780").version_sum());
+    }
+
+    #[test]
+    fn test_eval() {
+        assert_eq!(3, Packet::from_hex("C200B40A82").eval());
+        assert_eq!(54, Packet::from_hex("04005AC33890").eval());
+        assert_eq!(7, Packet::from_hex("880086C3E88112").eval());
+        assert_eq!(9, Packet::from_hex("CE00C43D881120").eval());
+        assert_eq!(1, Packet::from_hex("D8005AC2A8F0").eval());
+        assert_eq!(0, Packet::from_hex("F600BC2D8F").eval());
+        assert_eq!(0, Packet::from_hex("9C005AC2F8F0").eval());
+        assert_eq!(1, Packet::from_hex("9C0141080250320F1802104A08").eval());
     }
 }

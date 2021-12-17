@@ -44,6 +44,13 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 // min-x. We then have two constraints to satisfy: does the trajectory intersect with the target
 // area at all, and if it does, is there an x-velocity that gets us there in the right number of
 // steps?
+//
+// ----
+//
+// And now for some morning-after thoughts. What if we DID do the quadratic equation thing to get
+// min_x_velocity? As a reminder, we're interested in X^2 + X >= 2H, or, rearranging a bit:
+// X^2 + X - 2H >= 0. Applying the quadratic equation, we have: (-1 ± sqrt(1 + 8H)) / 2. We can rule
+// out the negative velocities, since they don't make sense for our use case.
 
 type Trajectory = (i32, i32);
 
@@ -86,17 +93,8 @@ impl TargetArea {
     }
 
     fn possible_x_velocities(&self) -> Vec<i32> {
-        let x_min = {
-            let mut x_velocity = 0;
-
-            loop {
-                if (x_velocity * (x_velocity + 1) / 2) >= *self.x_range.start() {
-                    break x_velocity;
-                }
-
-                x_velocity += 1;
-            }
-        };
+        let x_min =
+            ((((1 + (8 * self.x_range.start())) as f64).sqrt() - 1f64) / 2f64).ceil() as i32;
 
         let mut possible_x_velocities = Vec::new();
 

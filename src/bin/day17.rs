@@ -1,4 +1,5 @@
 use std::{env, error};
+use std::collections::HashSet;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
 
@@ -9,6 +10,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         let target_area = TargetArea::from_str(std::fs::read_to_string(path)?.as_str()).unwrap();
 
         println!("Max height: {}", target_area.max_height());
+        println!("Distinct trajectories: {}", target_area.distinct_trajectories().len());
 
         Ok(())
     } else {
@@ -59,6 +61,12 @@ impl TargetArea {
         max_y_velocity * (max_y_velocity + 1) / 2
     }
 
+    pub fn distinct_trajectories(&self) -> HashSet<Trajectory> {
+        self.possible_trajectories().into_iter()
+            .filter(|trajectory| self.intersects(trajectory))
+            .collect()
+    }
+
     fn possible_trajectories(&self) -> Vec<Trajectory> {
         let mut possible_trajectories = Vec::new();
 
@@ -104,7 +112,7 @@ impl TargetArea {
 
     fn possible_y_velocities(&self) -> Vec<i32> {
         let mut possible_y_velocities = Vec::new();
-        let mut initial_velocity = 0;
+        let mut initial_velocity = *self.y_range.start() - 1;
 
         while -initial_velocity >= *self.y_range.start() {
             initial_velocity += 1;
@@ -178,7 +186,6 @@ impl FromStr for TargetArea {
             y_range: y_min..=y_max,
         })
     }
-    // target area: x=128..160, y=-142..-88
 }
 
 #[cfg(test)]
@@ -203,5 +210,15 @@ mod test {
         };
 
         assert_eq!(45, target_area.max_height());
+    }
+
+    #[test]
+    fn test_distinct_trajectories() {
+        let target_area = TargetArea {
+            x_range: 20..=30,
+            y_range: -10..=-5,
+        };
+
+        assert_eq!(112, target_area.distinct_trajectories().len());
     }
 }

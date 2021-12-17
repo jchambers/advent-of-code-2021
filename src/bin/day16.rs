@@ -1,7 +1,7 @@
+use crate::Packet::Operator;
 use hex::FromHexError;
 use std::cmp::min;
 use std::{env, error};
-use crate::Packet::Operator;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -40,7 +40,7 @@ enum Packet {
     Operator {
         header: Header,
         sub_packets: Vec<Packet>,
-    }
+    },
 }
 
 impl Packet {
@@ -48,10 +48,11 @@ impl Packet {
     const LITERAL_HAS_MORE_BIT: u8 = 0b00010000;
     const LITERAL_NIBBLE_MASK: u8 = 0b00001111;
 
-    pub fn next_from_bit_stream(bit_stream: &mut BitStream) -> Self {
+    pub fn next_from_bit_stream(bit_stream: &mut BitStream) -> (Self, usize) {
+        let initial_position = bit_stream.position();
         let header = Header::next_from_bit_stream(bit_stream);
 
-        match header.type_id {
+        let packet = match header.type_id {
             Packet::LITERAL_TYPE_ID => {
                 // Literal! Read five-bit chunks until we get a "last chunk" bit.
                 let mut value = 0u64;
@@ -63,21 +64,51 @@ impl Packet {
                     value |= (next_nibble & Packet::LITERAL_NIBBLE_MASK) as u64;
 
                     if next_nibble & Packet::LITERAL_HAS_MORE_BIT == 0 {
-                        bit_stream.align_to_nibble();
                         break;
                     }
                 }
 
                 Packet::Literal { header, value }
-            },
+            }
             _ => {
                 // Operator
+                let length_type = bit_stream.next_bits(1)[0];
+
+                let mut sub_packets = Vec::new();
+
+                if length_type == 0 {
+                    // 15-bit bit count
+                    let target_bit_count =
+                        u16::from_be_bytes(bit_stream.next_bits(15).try_into().unwrap()) as usize;
+                    let mut bits_consumed = 0;
+
+                    while bits_consumed < target_bit_count {
+                        let (packet, bits) = Packet::next_from_bit_stream(bit_stream);
+
+                        sub_packets.push(packet);
+                        bits_consumed += bits;
+                    }
+                } else {
+                    // 11-bit packet count
+                    let target_packet_count =
+                        u16::from_be_bytes(bit_stream.next_bits(11).try_into().unwrap());
+
+                    for _ in 0..target_packet_count {
+                        let (packet, _) = Packet::next_from_bit_stream(bit_stream);
+                        sub_packets.push(packet);
+                    }
+                }
+
                 Operator {
                     header,
-                    sub_packets: vec![]
+                    sub_packets,
                 }
             }
-        }
+        };
+
+        let bits_consumed = bit_stream.position() - initial_position;
+
+        (packet, bits_consumed)
     }
 }
 
@@ -136,14 +167,15 @@ impl BitStream {
         (self.bytes[byte_index] & BitStream::BIT_MASK[bit_offset]) >> (7 - bit_offset)
     }
 
-    pub fn align_to_nibble(&mut self) {
-        self.position += (4 - (self.position % 4)) % 4;
+    pub fn position(&self) -> usize {
+        self.position
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::Packet::Literal;
     use std::collections::VecDeque;
 
     #[test]
@@ -179,14 +211,93 @@ mod test {
 
     #[test]
     fn test_literal_from_bit_stream() {
-        let mut bit_stream = BitStream::new(vec![0xd2, 0xfe, 0x28]);
+        let mut bit_stream = BitStream::from_hex("D2FE28").unwrap();
 
-        assert_eq!(Packet::Literal {
+        assert_eq!(
+            (
+                Packet::Literal {
+                    header: Header {
+                        version: 6,
+                        type_id: 4,
+                    },
+                    value: 2021
+                },
+                21
+            ),
+            Packet::next_from_bit_stream(&mut bit_stream)
+        );
+    }
+
+    #[test]
+    fn test_operator_from_bit_count() {
+        let mut bit_stream = BitStream::from_hex("38006F45291200").unwrap();
+
+        let expected = Packet::Operator {
             header: Header {
-                version: 6,
-                type_id: 4,
+                version: 1,
+                type_id: 6,
             },
-            value: 2021
-        }, Packet::next_from_bit_stream(&mut bit_stream));
+            sub_packets: vec![
+                Literal {
+                    header: Header {
+                        version: 6,
+                        type_id: 4,
+                    },
+                    value: 10,
+                },
+                Literal {
+                    header: Header {
+                        version: 2,
+                        type_id: 4,
+                    },
+                    value: 20,
+                },
+            ],
+        };
+
+        assert_eq!(
+            (expected, 49),
+            Packet::next_from_bit_stream(&mut bit_stream)
+        );
+    }
+
+    #[test]
+    fn test_operator_from_packet_count() {
+        let mut bit_stream = BitStream::from_hex("EE00D40C823060").unwrap();
+
+        let expected = Packet::Operator {
+            header: Header {
+                version: 7,
+                type_id: 3,
+            },
+            sub_packets: vec![
+                Literal {
+                    header: Header {
+                        version: 2,
+                        type_id: 4,
+                    },
+                    value: 1,
+                },
+                Literal {
+                    header: Header {
+                        version: 4,
+                        type_id: 4,
+                    },
+                    value: 2,
+                },
+                Literal {
+                    header: Header {
+                        version: 1,
+                        type_id: 4,
+                    },
+                    value: 3,
+                },
+            ],
+        };
+
+        assert_eq!(
+            (expected, 51),
+            Packet::next_from_bit_stream(&mut bit_stream)
+        );
     }
 }

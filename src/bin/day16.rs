@@ -7,7 +7,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let _bit_stream = BitStream::from_hex(std::fs::read_to_string(path)?.as_str())?;
+        let mut bit_stream = BitStream::from_hex(std::fs::read_to_string(path)?.as_str())?;
+        let packet = Packet::next_from_bit_stream(&mut bit_stream);
+
+        println!("Version sum: {}", packet.version_sum());
 
         Ok(())
     } else {
@@ -48,11 +51,10 @@ impl Packet {
     const LITERAL_HAS_MORE_BIT: u8 = 0b00010000;
     const LITERAL_NIBBLE_MASK: u8 = 0b00001111;
 
-    pub fn next_from_bit_stream(bit_stream: &mut BitStream) -> (Self, usize) {
-        let initial_position = bit_stream.position();
+    pub fn next_from_bit_stream(bit_stream: &mut BitStream) -> Self {
         let header = Header::next_from_bit_stream(bit_stream);
 
-        let packet = match header.type_id {
+        match header.type_id {
             Packet::LITERAL_TYPE_ID => {
                 // Literal! Read five-bit chunks until we get a "last chunk" bit.
                 let mut value = 0u64;
@@ -80,13 +82,11 @@ impl Packet {
                     // 15-bit bit count
                     let target_bit_count =
                         u16::from_be_bytes(bit_stream.next_bits(15).try_into().unwrap()) as usize;
-                    let mut bits_consumed = 0;
 
-                    while bits_consumed < target_bit_count {
-                        let (packet, bits) = Packet::next_from_bit_stream(bit_stream);
+                    let target_position = bit_stream.position() + target_bit_count;
 
-                        sub_packets.push(packet);
-                        bits_consumed += bits;
+                    while bit_stream.position < target_position {
+                        sub_packets.push(Packet::next_from_bit_stream(bit_stream));
                     }
                 } else {
                     // 11-bit packet count
@@ -94,8 +94,7 @@ impl Packet {
                         u16::from_be_bytes(bit_stream.next_bits(11).try_into().unwrap());
 
                     for _ in 0..target_packet_count {
-                        let (packet, _) = Packet::next_from_bit_stream(bit_stream);
-                        sub_packets.push(packet);
+                        sub_packets.push(Packet::next_from_bit_stream(bit_stream));
                     }
                 }
 
@@ -104,11 +103,23 @@ impl Packet {
                     sub_packets,
                 }
             }
-        };
+        }
+    }
 
-        let bits_consumed = bit_stream.position() - initial_position;
-
-        (packet, bits_consumed)
+    pub fn version_sum(&self) -> u32 {
+        match self {
+            Packet::Literal { header, value: _ } => header.version as u32,
+            Packet::Operator {
+                header,
+                sub_packets,
+            } => {
+                header.version as u32
+                    + sub_packets
+                        .iter()
+                        .map(|sub_packet| sub_packet.version_sum())
+                        .sum::<u32>()
+            }
+        }
     }
 }
 
@@ -214,16 +225,13 @@ mod test {
         let mut bit_stream = BitStream::from_hex("D2FE28").unwrap();
 
         assert_eq!(
-            (
-                Packet::Literal {
-                    header: Header {
-                        version: 6,
-                        type_id: 4,
-                    },
-                    value: 2021
+            Packet::Literal {
+                header: Header {
+                    version: 6,
+                    type_id: 4,
                 },
-                21
-            ),
+                value: 2021
+            },
             Packet::next_from_bit_stream(&mut bit_stream)
         );
     }
@@ -255,10 +263,7 @@ mod test {
             ],
         };
 
-        assert_eq!(
-            (expected, 49),
-            Packet::next_from_bit_stream(&mut bit_stream)
-        );
+        assert_eq!(expected, Packet::next_from_bit_stream(&mut bit_stream));
     }
 
     #[test]
@@ -295,9 +300,39 @@ mod test {
             ],
         };
 
+        assert_eq!(expected, Packet::next_from_bit_stream(&mut bit_stream));
+    }
+
+    #[test]
+    fn test_packet_version_sum() {
         assert_eq!(
-            (expected, 51),
-            Packet::next_from_bit_stream(&mut bit_stream)
+            16,
+            Packet::next_from_bit_stream(&mut BitStream::from_hex("8A004A801A8002F478").unwrap())
+                .version_sum()
+        );
+
+        assert_eq!(
+            12,
+            Packet::next_from_bit_stream(
+                &mut BitStream::from_hex("620080001611562C8802118E34").unwrap()
+            )
+            .version_sum()
+        );
+
+        assert_eq!(
+            23,
+            Packet::next_from_bit_stream(
+                &mut BitStream::from_hex("C0015000016115A2E0802F182340").unwrap()
+            )
+            .version_sum()
+        );
+
+        assert_eq!(
+            31,
+            Packet::next_from_bit_stream(
+                &mut BitStream::from_hex("A0016C880162017C3686B18A3D4780").unwrap()
+            )
+            .version_sum()
         );
     }
 }

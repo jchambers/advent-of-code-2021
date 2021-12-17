@@ -1,6 +1,5 @@
 use crate::Packet::Operator;
 use hex::FromHexError;
-use std::cmp::min;
 use std::{env, error};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
@@ -27,8 +26,8 @@ struct Header {
 impl Header {
     pub fn next_from_bit_stream(bit_stream: &mut BitStream) -> Self {
         Header {
-            version: bit_stream.next_bits(3)[0],
-            type_id: bit_stream.next_bits(3)[0],
+            version: bit_stream.next_bits(3) as u8,
+            type_id: bit_stream.next_bits(3) as u8,
         }
     }
 }
@@ -60,7 +59,7 @@ impl Packet {
                 let mut value = 0u64;
 
                 loop {
-                    let next_nibble = bit_stream.next_bits(5)[0];
+                    let next_nibble = bit_stream.next_bits(5) as u8;
 
                     value <<= 4;
                     value |= (next_nibble & Packet::LITERAL_NIBBLE_MASK) as u64;
@@ -74,24 +73,21 @@ impl Packet {
             }
             _ => {
                 // Operator
-                let length_type = bit_stream.next_bits(1)[0];
+                let length_type = bit_stream.next_bits(1);
 
                 let mut sub_packets = Vec::new();
 
                 if length_type == 0 {
                     // 15-bit bit count
-                    let target_bit_count =
-                        u16::from_be_bytes(bit_stream.next_bits(15).try_into().unwrap()) as usize;
-
+                    let target_bit_count = bit_stream.next_bits(15) as usize;
                     let target_position = bit_stream.position() + target_bit_count;
 
-                    while bit_stream.position < target_position {
+                    while bit_stream.position() < target_position {
                         sub_packets.push(Packet::next_from_bit_stream(bit_stream));
                     }
                 } else {
                     // 11-bit packet count
-                    let target_packet_count =
-                        u16::from_be_bytes(bit_stream.next_bits(11).try_into().unwrap());
+                    let target_packet_count = bit_stream.next_bits(11);
 
                     for _ in 0..target_packet_count {
                         sub_packets.push(Packet::next_from_bit_stream(bit_stream));
@@ -149,24 +145,15 @@ impl BitStream {
         BitStream { bytes, position: 0 }
     }
 
-    pub fn next_bits(&mut self, n_bits: usize) -> Vec<u8> {
-        let mut collected_bytes = Vec::new();
-        let mut collected_bits = 0;
+    pub fn next_bits(&mut self, n_bits: usize) -> u32 {
+        let mut next_bits = 0u32;
 
-        while collected_bits < n_bits {
-            let mut byte = 0;
-
-            for _ in 0..min(n_bits - collected_bits, 8) {
-                byte <<= 1;
-                byte |= self.next_bit();
-
-                collected_bits += 1;
-            }
-
-            collected_bytes.push(byte);
+        for _ in 0..n_bits {
+            next_bits <<= 1;
+            next_bits |= self.next_bit() as u32;
         }
 
-        collected_bytes
+        next_bits
     }
 
     fn next_bit(&mut self) -> u8 {
@@ -213,11 +200,11 @@ mod test {
     fn test_next_bits() {
         let mut bit_stream = BitStream::new(vec![0xd2, 0xfe, 0x28]);
 
-        assert_eq!(vec![0b110], bit_stream.next_bits(3));
-        assert_eq!(vec![0b100], bit_stream.next_bits(3));
-        assert_eq!(vec![0b10111], bit_stream.next_bits(5));
-        assert_eq!(vec![0b11110], bit_stream.next_bits(5));
-        assert_eq!(vec![0b00101], bit_stream.next_bits(5));
+        assert_eq!(0b110, bit_stream.next_bits(3));
+        assert_eq!(0b100, bit_stream.next_bits(3));
+        assert_eq!(0b10111, bit_stream.next_bits(5));
+        assert_eq!(0b11110, bit_stream.next_bits(5));
+        assert_eq!(0b00101, bit_stream.next_bits(5));
     }
 
     #[test]

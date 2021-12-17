@@ -50,7 +50,13 @@ impl Packet {
     const LITERAL_HAS_MORE_BIT: u8 = 0b00010000;
     const LITERAL_NIBBLE_MASK: u8 = 0b00001111;
 
-    pub fn next_from_bit_stream(bit_stream: &mut BitStream) -> Self {
+    fn from_hex(hex: &str) -> Self {
+        let mut bit_stream = BitStream::from_hex(hex).unwrap();
+
+        Packet::next_from_bit_stream(&mut bit_stream)
+    }
+
+    fn next_from_bit_stream(bit_stream: &mut BitStream) -> Self {
         let header = Header::next_from_bit_stream(bit_stream);
 
         match header.type_id {
@@ -209,8 +215,6 @@ mod test {
 
     #[test]
     fn test_literal_from_bit_stream() {
-        let mut bit_stream = BitStream::from_hex("D2FE28").unwrap();
-
         assert_eq!(
             Packet::Literal {
                 header: Header {
@@ -219,14 +223,12 @@ mod test {
                 },
                 value: 2021
             },
-            Packet::next_from_bit_stream(&mut bit_stream)
+            Packet::from_hex("D2FE28")
         );
     }
 
     #[test]
     fn test_operator_from_bit_count() {
-        let mut bit_stream = BitStream::from_hex("38006F45291200").unwrap();
-
         let expected = Packet::Operator {
             header: Header {
                 version: 1,
@@ -250,13 +252,11 @@ mod test {
             ],
         };
 
-        assert_eq!(expected, Packet::next_from_bit_stream(&mut bit_stream));
+        assert_eq!(expected, Packet::from_hex("38006F45291200"));
     }
 
     #[test]
     fn test_operator_from_packet_count() {
-        let mut bit_stream = BitStream::from_hex("EE00D40C823060").unwrap();
-
         let expected = Packet::Operator {
             header: Header {
                 version: 7,
@@ -287,39 +287,14 @@ mod test {
             ],
         };
 
-        assert_eq!(expected, Packet::next_from_bit_stream(&mut bit_stream));
+        assert_eq!(expected, Packet::from_hex("EE00D40C823060"));
     }
 
     #[test]
     fn test_packet_version_sum() {
-        assert_eq!(
-            16,
-            Packet::next_from_bit_stream(&mut BitStream::from_hex("8A004A801A8002F478").unwrap())
-                .version_sum()
-        );
-
-        assert_eq!(
-            12,
-            Packet::next_from_bit_stream(
-                &mut BitStream::from_hex("620080001611562C8802118E34").unwrap()
-            )
-            .version_sum()
-        );
-
-        assert_eq!(
-            23,
-            Packet::next_from_bit_stream(
-                &mut BitStream::from_hex("C0015000016115A2E0802F182340").unwrap()
-            )
-            .version_sum()
-        );
-
-        assert_eq!(
-            31,
-            Packet::next_from_bit_stream(
-                &mut BitStream::from_hex("A0016C880162017C3686B18A3D4780").unwrap()
-            )
-            .version_sum()
-        );
+        assert_eq!(16, Packet::from_hex("8A004A801A8002F478").version_sum());
+        assert_eq!(12, Packet::from_hex("620080001611562C8802118E34").version_sum());
+        assert_eq!(23, Packet::from_hex("C0015000016115A2E0802F182340").version_sum());
+        assert_eq!(31, Packet::from_hex("A0016C880162017C3686B18A3D4780").version_sum());
     }
 }

@@ -1,7 +1,7 @@
-use std::{env, error};
 use std::collections::HashSet;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
+use std::{env, error};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -10,7 +10,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         let target_area = TargetArea::from_str(std::fs::read_to_string(path)?.as_str()).unwrap();
 
         println!("Max height: {}", target_area.max_height());
-        println!("Distinct trajectories: {}", target_area.distinct_trajectories().len());
+        println!(
+            "Distinct trajectories: {}",
+            target_area.distinct_trajectories().len()
+        );
 
         Ok(())
     } else {
@@ -52,7 +55,9 @@ struct TargetArea {
 
 impl TargetArea {
     pub fn max_height(&self) -> i32 {
-        let max_y_velocity = self.possible_trajectories().iter()
+        let max_y_velocity = self
+            .possible_trajectories()
+            .iter()
             .filter(|trajectory| self.intersects(trajectory))
             .map(|trajectory| trajectory.1)
             .max()
@@ -62,7 +67,8 @@ impl TargetArea {
     }
 
     pub fn distinct_trajectories(&self) -> HashSet<Trajectory> {
-        self.possible_trajectories().into_iter()
+        self.possible_trajectories()
+            .into_iter()
             .filter(|trajectory| self.intersects(trajectory))
             .collect()
     }
@@ -173,11 +179,21 @@ impl FromStr for TargetArea {
         let coordinates = string.strip_prefix("target area: ").unwrap();
         let mut ranges = coordinates.split(", ");
 
-        let mut x_range = ranges.next().unwrap().strip_prefix("x=").unwrap().split("..");
+        let mut x_range = ranges
+            .next()
+            .unwrap()
+            .strip_prefix("x=")
+            .unwrap()
+            .split("..");
         let x_min = i32::from_str(x_range.next().unwrap()).unwrap();
         let x_max = i32::from_str(x_range.next().unwrap()).unwrap();
 
-        let mut y_range = ranges.next().unwrap().strip_prefix("y=").unwrap().split("..");
+        let mut y_range = ranges
+            .next()
+            .unwrap()
+            .strip_prefix("y=")
+            .unwrap()
+            .split("..");
         let y_min = i32::from_str(y_range.next().unwrap()).unwrap();
         let y_max = i32::from_str(y_range.next().unwrap()).unwrap();
 
@@ -199,7 +215,10 @@ mod test {
             y_range: -10..=-5,
         };
 
-        assert_eq!(expected, TargetArea::from_str("target area: x=20..30, y=-10..-5").unwrap());
+        assert_eq!(
+            expected,
+            TargetArea::from_str("target area: x=20..30, y=-10..-5").unwrap()
+        );
     }
 
     #[test]

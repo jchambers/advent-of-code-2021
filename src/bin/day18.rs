@@ -159,6 +159,40 @@ impl SnailfishNumber {
             Element::Pair(pair) => pair.add_to_rightmost_literal(value),
         };
     }
+
+    fn try_split(&mut self) -> bool {
+        let split_left = match &mut self.left {
+            Element::Literal(value) => if *value >= 10 {
+                self.left = Element::Pair(Box::new(SnailfishNumber {
+                    left: Element::Literal(*value / 2),
+                    right: Element::Literal((*value / 2) + (*value % 2)),
+                }));
+
+                true
+            } else {
+                false
+            },
+            Element::Pair(pair) => pair.try_split()
+        };
+
+        if split_left {
+            return true;
+        }
+
+        match &mut self.right {
+            Element::Literal(value) => if *value >= 10 {
+                self.right = Element::Pair(Box::new(SnailfishNumber {
+                    left: Element::Literal(*value / 2),
+                    right: Element::Literal((*value / 2) + (*value % 2)),
+                }));
+
+                true
+            } else {
+                false
+            },
+            Element::Pair(pair) => pair.try_split()
+        }
+    }
 }
 
 enum Token {
@@ -252,5 +286,15 @@ mod test {
 
             assert_eq!(expected, exploded);
         }
+    }
+
+    #[test]
+    fn test_split() {
+        let expected = SnailfishNumber::from_str("[[[[0,7],4],[[7,8],[0,13]]],[1,1]]").unwrap();
+
+        let mut split = SnailfishNumber::from_str("[[[[0,7],4],[15,[0,13]]],[1,1]]").unwrap();
+        assert!(split.try_split());
+
+        assert_eq!(expected, split);
     }
 }

@@ -50,6 +50,18 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 // min_x_velocity? As a reminder, we're interested in X^2 + X >= 2H, or, rearranging a bit:
 // X^2 + X - 2H >= 0. Applying the quadratic equation, we have: (-1 ± sqrt(1 + 8H)) / 2. We can rule
 // out the negative velocities, since they don't make sense for our use case.
+//
+// ----
+//
+// …and some evening-after thoughts. I'll have to add some photos from my paper notebook. But now,
+// the strategy is:
+//
+// - For every candidate x velocity (everything from x_min above through "overshoot the whole target
+//   area in a single shot"), do closed-form calculations to figure out the time range when a
+//   projectile with that initial velocity will be in the target area, disregarding y-coordinates
+// - Do an analogous thing with y velocities
+// - For every pair of x_candidate, y_candidate, figure out if they're in the target zone at
+//   overlapping times. If they are, then it's a viable trajectory.
 
 type Trajectory = (i32, i32);
 

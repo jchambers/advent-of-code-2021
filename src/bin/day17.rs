@@ -83,8 +83,8 @@ impl TargetArea {
     fn possible_trajectories(&self) -> Vec<Trajectory> {
         let mut possible_trajectories = Vec::new();
 
-        for x_velocity in self.possible_x_velocities() {
-            for y_velocity in self.possible_y_velocities() {
+        for (x_velocity, _) in self.possible_x_velocities() {
+            for (y_velocity, _) in self.possible_y_velocities() {
                 possible_trajectories.push((x_velocity, y_velocity));
             }
         }
@@ -92,7 +92,7 @@ impl TargetArea {
         possible_trajectories
     }
 
-    fn possible_x_velocities(&self) -> Vec<i32> {
+    fn possible_x_velocities(&self) -> Vec<(i32, RangeInclusive<i32>)> {
         let v_x_min =
             ((((1 + (8 * self.x_range.start())) as f64).sqrt() - 1f64) / 2f64).ceil() as i32;
 
@@ -102,15 +102,14 @@ impl TargetArea {
             let first_t_in_target =
                 Self::time_to_reach_x_position(v_x, *self.x_range.start()).ceil() as i32;
 
-            // TODO We'll want this later
-            let _last_t_in_target = if Self::max_x_distance(v_x) > *self.x_range.end() {
+            let last_t_in_target = if Self::max_x_distance(v_x) > *self.x_range.end() {
                 Self::time_to_reach_x_position(v_x, *self.x_range.end()).floor() as i32
             } else {
                 i32::MAX
             };
 
             if Self::position_after_time(v_x, first_t_in_target) <= *self.x_range.end() {
-                possible_x_velocities.push(v_x);
+                possible_x_velocities.push((v_x, first_t_in_target..=last_t_in_target));
             }
         }
 
@@ -143,23 +142,24 @@ impl TargetArea {
             + 1f64
     }
 
-    fn possible_y_velocities(&self) -> Vec<i32> {
+    fn possible_y_velocities(&self) -> Vec<(i32, RangeInclusive<i32>)> {
         let mut possible_y_velocities = Vec::new();
 
         for v_y in *self.y_range.start()..0 {
             let first_t_in_target =
                 Self::time_to_reach_y_position(v_y, *self.y_range.end()).ceil() as i32;
 
-            // TODO We'll want this later
-            let _last_t_in_target =
+            let last_t_in_target =
                 Self::time_to_reach_y_position(v_y, *self.y_range.start()).floor() as i32;
 
             if Self::position_after_time(v_y, first_t_in_target) >= *self.y_range.start() {
-                possible_y_velocities.push(v_y);
+                possible_y_velocities.push((v_y, first_t_in_target..=last_t_in_target));
 
                 // For every negative velocity, there's a positive velocity that will "splash" at
                 // the horizon with the same negative velocity
-                possible_y_velocities.push(-v_y - 1);
+                let positive_velocity = -v_y - 1;
+                let hang_time = (2 * positive_velocity) + 1;
+                possible_y_velocities.push((-v_y - 1, first_t_in_target + hang_time..=last_t_in_target + hang_time));
             }
         }
 

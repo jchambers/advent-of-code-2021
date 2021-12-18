@@ -93,25 +93,45 @@ impl TargetArea {
     }
 
     fn possible_x_velocities(&self) -> Vec<i32> {
-        let x_min =
+        let v_x_min =
             ((((1 + (8 * self.x_range.start())) as f64).sqrt() - 1f64) / 2f64).ceil() as i32;
 
         let mut possible_x_velocities = Vec::new();
 
-        for initial_velocity in x_min..=*self.x_range.end() {
-            let mut position = 0;
+        for v_x in v_x_min..=*self.x_range.end() {
+            let first_t_in_target =
+                Self::time_to_reach_position(v_x, *self.x_range.start()).ceil() as i32;
 
-            for velocity in (1..=initial_velocity).rev() {
-                position += velocity;
+            // TODO We'll want this later
+            let _last_t_in_target = if Self::max_x_distance(v_x) > *self.x_range.end() {
+                Self::time_to_reach_position(v_x, *self.x_range.end()).floor() as i32
+            } else {
+                i32::MAX
+            };
 
-                if self.x_range.contains(&position) {
-                    possible_x_velocities.push(initial_velocity);
-                    break;
-                }
+            if Self::x_position_after_time(v_x, first_t_in_target) <= *self.x_range.end() {
+                possible_x_velocities.push(v_x);
             }
         }
 
         possible_x_velocities
+    }
+
+    fn max_x_distance(initial_velocity: i32) -> i32 {
+        initial_velocity * (initial_velocity + 1) / 2
+    }
+
+    fn x_position_after_time(initial_velocity: i32, time: i32) -> i32 {
+        Self::max_x_distance(initial_velocity) - Self::max_x_distance(initial_velocity - time)
+    }
+
+    fn time_to_reach_position(initial_velocity: i32, position: i32) -> f64 {
+        (((2 * initial_velocity - 1) as f64
+            - (((2 * initial_velocity - 1) * (2 * initial_velocity - 1)
+                + 8 * (initial_velocity - position)) as f64)
+                .sqrt())
+            / 2f64)
+            + 1f64
     }
 
     fn possible_y_velocities(&self) -> Vec<i32> {
@@ -237,5 +257,19 @@ mod test {
         };
 
         assert_eq!(112, target_area.distinct_trajectories().len());
+    }
+
+    #[test]
+    fn test_time_to_reach_position() {
+        assert_eq!(1, TargetArea::time_to_reach_position(6, 6).ceil() as u32);
+        assert_eq!(2, TargetArea::time_to_reach_position(6, 10).ceil() as u32);
+        assert_eq!(5, TargetArea::time_to_reach_position(6, 20).ceil() as u32);
+    }
+
+    #[test]
+    fn test_x_position_after_time() {
+        assert_eq!(0, TargetArea::x_position_after_time(6, 0));
+        assert_eq!(6, TargetArea::x_position_after_time(6, 1));
+        assert_eq!(11, TargetArea::x_position_after_time(6, 2));
     }
 }

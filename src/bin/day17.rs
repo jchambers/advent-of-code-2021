@@ -173,7 +173,7 @@ impl TargetArea {
                 let hang_time = (2 * positive_velocity) + 1;
 
                 possible_y_velocities.push((
-                    -v_y - 1,
+                    positive_velocity,
                     first_t_in_target + hang_time..=last_t_in_target + hang_time,
                 ));
             }

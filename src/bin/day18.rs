@@ -29,11 +29,11 @@ struct SnailfishNumber {
     right: Element,
 }
 
-enum Token {
-    OpenPair,
-    ClosePair,
-    Separator,
-    Literal(u32),
+#[derive(Debug)]
+struct ExplodeState {
+    zeroed_element: bool,
+    left: Option<u32>,
+    right: Option<u32>,
 }
 
 impl SnailfishNumber {
@@ -76,6 +76,96 @@ impl SnailfishNumber {
             Err("Unexpected token (expected OpenPair)".into())
         }
     }
+
+    fn try_explode(&mut self, depth: usize) -> Option<ExplodeState> {
+        if depth < 4 {
+            if let Element::Pair(pair) = &mut self.left {
+                if let Some(explode_state) = pair.try_explode(depth + 1) {
+                    if !explode_state.zeroed_element {
+                        self.left = Element::Literal(0);
+                    }
+
+                    if let Some(right_value) = explode_state.right {
+                        match &mut self.right {
+                            Element::Literal(old) => self.right = Element::Literal(*old + right_value),
+                            Element::Pair(pair) => pair.add_to_leftmost_literal(right_value),
+                        }
+                    }
+
+                    Some(ExplodeState {
+                        zeroed_element: true,
+                        left: explode_state.left,
+                        right: None,
+                    })
+                } else {
+                    None
+                }
+            } else if let Element::Pair(pair) = &mut self.right {
+                if let Some(explode_state) = pair.try_explode(depth + 1) {
+                    if !explode_state.zeroed_element {
+                        self.right = Element::Literal(0);
+                    }
+
+                    if let Some(left_value) = explode_state.left {
+                        match &mut self.left {
+                            Element::Literal(old) => self.left = Element::Literal(*old + left_value),
+                            Element::Pair(pair) => pair.add_to_rightmost_literal(left_value),
+                        }
+                    }
+
+
+                    Some(ExplodeState {
+                        zeroed_element: true,
+                        left: None,
+                        right: explode_state.right,
+                    })
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            // The problem statement claims that exploding elements will always have two literals as
+            // elements
+            let left = match self.left {
+                Element::Literal(value) => value,
+                _ => unreachable!(),
+            };
+
+            let right = match self.right {
+                Element::Literal(value) => value,
+                _ => unreachable!(),
+            };
+
+            Some(ExplodeState {
+                zeroed_element: false,
+                left: Some(left),
+                right: Some(right),
+            })
+        }
+    }
+
+    fn add_to_leftmost_literal(&mut self, value: u32) {
+        match &mut self.left {
+            Element::Literal(old) => self.left = Element::Literal(*old + value),
+            Element::Pair(pair) => pair.add_to_leftmost_literal(value),
+        };
+    }
+
+    fn add_to_rightmost_literal(&mut self, value: u32) {
+        match &mut self.right {
+            Element::Literal(old) => self.right = Element::Literal(*old + value),
+            Element::Pair(pair) => pair.add_to_rightmost_literal(value),
+        };
+    }
+}
+
+enum Token {
+    OpenPair,
+    ClosePair,
+    Separator,
+    Literal(u32),
 }
 
 impl FromStr for SnailfishNumber {
@@ -132,5 +222,35 @@ mod test {
         };
 
         assert_eq!(expected, SnailfishNumber::from_str("[[[[[9,8],1],2],3],4]").unwrap());
+    }
+
+    #[test]
+    fn test_explode() {
+        {
+            let expected = SnailfishNumber::from_str("[[[[0,9],2],3],4]").unwrap();
+
+            let mut exploded = SnailfishNumber::from_str("[[[[[9,8],1],2],3],4]").unwrap();
+            assert!(exploded.try_explode(0).is_some());
+
+            assert_eq!(expected, exploded);
+        }
+
+        {
+            let expected = SnailfishNumber::from_str("[7,[6,[5,[7,0]]]]").unwrap();
+
+            let mut exploded = SnailfishNumber::from_str("[7,[6,[5,[4,[3,2]]]]]").unwrap();
+            assert!(exploded.try_explode(0).is_some());
+
+            assert_eq!(expected, exploded);
+        }
+
+        {
+            let expected = SnailfishNumber::from_str("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]").unwrap();
+
+            let mut exploded = SnailfishNumber::from_str("[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]").unwrap();
+            assert!(exploded.try_explode(0).is_some());
+
+            assert_eq!(expected, exploded);
+        }
     }
 }

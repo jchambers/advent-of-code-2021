@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
 use std::{env, error};
@@ -62,34 +61,35 @@ struct TargetArea {
 
 impl TargetArea {
     pub fn max_height(&self) -> i32 {
-        let max_y_velocity = self
-            .possible_trajectories()
-            .iter()
-            .filter(|trajectory| self.intersects(trajectory))
-            .map(|trajectory| trajectory.1)
+        let v_y_max = self
+            .distinct_trajectories()
+            .into_iter()
+            .map(|(_, v_y)| v_y)
             .max()
             .unwrap();
 
-        max_y_velocity * (max_y_velocity + 1) / 2
+        v_y_max * (v_y_max + 1) / 2
     }
 
-    pub fn distinct_trajectories(&self) -> HashSet<Trajectory> {
-        self.possible_trajectories()
-            .into_iter()
-            .filter(|trajectory| self.intersects(trajectory))
-            .collect()
-    }
+    pub fn distinct_trajectories(&self) -> Vec<Trajectory> {
+        let mut trajectories = Vec::new();
 
-    fn possible_trajectories(&self) -> Vec<Trajectory> {
-        let mut possible_trajectories = Vec::new();
-
-        for (x_velocity, _) in self.possible_x_velocities() {
-            for (y_velocity, _) in self.possible_y_velocities() {
-                possible_trajectories.push((x_velocity, y_velocity));
+        for (v_x, x_time_range) in self.possible_x_velocities() {
+            for (v_y, y_time_range) in self.possible_y_velocities() {
+                if Self::ranges_overlap(&x_time_range, &y_time_range) {
+                    trajectories.push((v_x, v_y));
+                }
             }
         }
 
-        possible_trajectories
+        trajectories
+    }
+
+    fn ranges_overlap<T: std::cmp::PartialOrd>(
+        a: &RangeInclusive<T>,
+        b: &RangeInclusive<T>,
+    ) -> bool {
+        a.start() <= b.end() && a.end() >= b.start()
     }
 
     fn possible_x_velocities(&self) -> Vec<(i32, RangeInclusive<i32>)> {
@@ -156,44 +156,18 @@ impl TargetArea {
                 possible_y_velocities.push((v_y, first_t_in_target..=last_t_in_target));
 
                 // For every negative velocity, there's a positive velocity that will "splash" at
-                // the horizon with the same negative velocity
+                // the horizon (y = 0) with the same negative velocity
                 let positive_velocity = -v_y - 1;
                 let hang_time = (2 * positive_velocity) + 1;
-                possible_y_velocities.push((-v_y - 1, first_t_in_target + hang_time..=last_t_in_target + hang_time));
+
+                possible_y_velocities.push((
+                    -v_y - 1,
+                    first_t_in_target + hang_time..=last_t_in_target + hang_time,
+                ));
             }
         }
 
         possible_y_velocities
-    }
-
-    fn contains(&self, x: i32, y: i32) -> bool {
-        self.x_range.contains(&x) && self.y_range.contains(&y)
-    }
-
-    fn intersects(&self, trajectory: &Trajectory) -> bool {
-        let (mut x_velocity, mut y_velocity) = trajectory;
-
-        let mut x = 0;
-        let mut y = 0;
-
-        while x <= *self.x_range.end() && y >= *self.y_range.start() {
-            if self.contains(x, y) {
-                return true;
-            }
-
-            x += x_velocity;
-            y += y_velocity;
-
-            if x_velocity < 0 {
-                x_velocity += 1;
-            } else if x_velocity > 0 {
-                x_velocity -= 1;
-            }
-
-            y_velocity -= 1;
-        }
-
-        false
     }
 }
 

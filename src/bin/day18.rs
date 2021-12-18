@@ -12,7 +12,13 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let _lines = io::BufReader::new(File::open(path)?).lines();
+        let magnitude_of_sum = io::BufReader::new(File::open(path)?).lines()
+            .filter_map(|line| line.ok())
+            .map(|line| SnailfishNumber::from_str(line.as_str()).unwrap())
+            .sum::<SnailfishNumber>()
+            .magnitude();
+
+        println!("Magnitude of sum: {}", magnitude_of_sum);
 
         Ok(())
     } else {
@@ -78,6 +84,20 @@ impl SnailfishNumber {
         } else {
             Err("Unexpected token (expected OpenPair)".into())
         }
+    }
+
+    pub fn magnitude(&self) -> u32 {
+        let left_magnitude = 3 * match &self.left {
+            Element::Literal(value) => *value,
+            Element::Pair(pair) => pair.magnitude(),
+        };
+
+        let right_magnitude = 2 * match &self.right {
+            Element::Literal(value) => *value,
+            Element::Pair(pair) => pair.magnitude(),
+        };
+
+        left_magnitude + right_magnitude
     }
 
     fn reduce(&mut self) {
@@ -410,6 +430,22 @@ mod test {
                 .sum();
 
             assert_eq!(expected, sum);
+        }
+    }
+
+    #[test]
+    fn test_magnitude() {
+        let test_cases = [
+            ("[[1,2],[[3,4],5]]", 143),
+            ("[[[[0,7],4],[[7,8],[6,0]]],[8,1]]", 1384),
+            ("[[[[1,1],[2,2]],[3,3]],[4,4]]", 445),
+            ("[[[[3,0],[5,3]],[4,4]],[5,5]]", 791),
+            ("[[[[5,0],[7,4]],[5,5]],[6,6]]", 1137),
+            ("[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]", 3488),
+        ];
+
+        for (string, expected) in test_cases {
+            assert_eq!(expected, SnailfishNumber::from_str(string).unwrap().magnitude());
         }
     }
 }

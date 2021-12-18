@@ -1,7 +1,10 @@
 use std::{env, error, io};
 use std::collections::VecDeque;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::BufRead;
+use std::iter::Sum;
+use std::ops::Add;
 use std::str::FromStr;
 use crate::Token::{ClosePair, Literal, OpenPair, Separator};
 
@@ -77,6 +80,20 @@ impl SnailfishNumber {
         }
     }
 
+    fn reduce(&mut self) {
+        loop {
+            if let Some(_) = self.try_explode(0) {
+                continue;
+            } else {
+                if self.try_split() {
+                    continue;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
     fn try_explode(&mut self, depth: usize) -> Option<ExplodeState> {
         if depth < 4 {
             if let Element::Pair(pair) = &mut self.left {
@@ -92,15 +109,15 @@ impl SnailfishNumber {
                         }
                     }
 
-                    Some(ExplodeState {
+                    return Some(ExplodeState {
                         zeroed_element: true,
                         left: explode_state.left,
                         right: None,
                     })
-                } else {
-                    None
                 }
-            } else if let Element::Pair(pair) = &mut self.right {
+            }
+
+            if let Element::Pair(pair) = &mut self.right {
                 if let Some(explode_state) = pair.try_explode(depth + 1) {
                     if !explode_state.zeroed_element {
                         self.right = Element::Literal(0);
@@ -113,17 +130,12 @@ impl SnailfishNumber {
                         }
                     }
 
-
-                    Some(ExplodeState {
+                    return Some(ExplodeState {
                         zeroed_element: true,
                         left: None,
                         right: explode_state.right,
                     })
-                } else {
-                    None
                 }
-            } else {
-                None
             }
         } else {
             // The problem statement claims that exploding elements will always have two literals as
@@ -138,12 +150,14 @@ impl SnailfishNumber {
                 _ => unreachable!(),
             };
 
-            Some(ExplodeState {
+            return Some(ExplodeState {
                 zeroed_element: false,
                 left: Some(left),
                 right: Some(right),
             })
         }
+
+        None
     }
 
     fn add_to_leftmost_literal(&mut self, value: u32) {
@@ -195,6 +209,52 @@ impl SnailfishNumber {
     }
 }
 
+impl Add for SnailfishNumber {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut sum = SnailfishNumber {
+            left: Element::Pair(Box::new(self)),
+            right: Element::Pair(Box::new(rhs)),
+        };
+
+        sum.reduce();
+
+        sum
+    }
+}
+
+impl Sum for SnailfishNumber {
+    fn sum<I: Iterator<Item=Self>>(mut iter: I) -> Self {
+        let mut sum = iter.next().unwrap();
+
+        while let Some(next) = iter.next() {
+            sum = sum + next;
+        }
+
+        sum
+    }
+}
+
+impl Display for SnailfishNumber {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+
+        match &self.left {
+            Element::Literal(value) => write!(f, "{},", *value)?,
+            Element::Pair(pair) => write!(f, "{},", pair)?,
+        }
+
+        match &self.right {
+            Element::Literal(value) => write!(f, "{}]", *value)?,
+            Element::Pair(pair) => write!(f, "{}]", pair)?,
+        }
+
+        Ok(())
+    }
+}
+
 enum Token {
     OpenPair,
     ClosePair,
@@ -234,6 +294,7 @@ impl FromStr for SnailfishNumber {
 
 #[cfg(test)]
 mod test {
+    use indoc::indoc;
     use super::*;
 
     #[test]
@@ -286,6 +347,15 @@ mod test {
 
             assert_eq!(expected, exploded);
         }
+
+        {
+            let expected = SnailfishNumber::from_str("[[[[0,7],4],[15,[0,13]]],[1,1]]").unwrap();
+
+            let mut exploded = SnailfishNumber::from_str("[[[[0,7],4],[7,[[8,4],9]]],[1,1]]").unwrap();
+            assert!(exploded.try_explode(0).is_some());
+
+            assert_eq!(expected, exploded);
+        }
     }
 
     #[test]
@@ -296,5 +366,50 @@ mod test {
         assert!(split.try_split());
 
         assert_eq!(expected, split);
+    }
+
+    #[test]
+    fn test_reduce() {
+        let expected = SnailfishNumber::from_str("[[[[0,7],4],[[7,8],[6,0]]],[8,1]]").unwrap();
+
+        let mut reduced = SnailfishNumber::from_str("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]").unwrap();
+        reduced.reduce();
+
+        assert_eq!(expected, reduced);
+    }
+
+    #[test]
+    fn test_add() {
+        {
+            let lhs = SnailfishNumber::from_str("[[[[4,3],4],4],[7,[[8,4],9]]]").unwrap();
+            let rhs = SnailfishNumber::from_str("[1,1]").unwrap();
+
+            let expected_sum = SnailfishNumber::from_str("[[[[0,7],4],[[7,8],[6,0]]],[8,1]]").unwrap();
+
+            assert_eq!(expected_sum, lhs + rhs);
+        }
+
+        {
+            let expected = SnailfishNumber::from_str("[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]").unwrap();
+
+            let numbers: &str = indoc! {"
+                [[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]
+                [7,[[[3,7],[4,3]],[[6,3],[8,8]]]]
+                [[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]
+                [[[[2,4],7],[6,[0,5]]],[[[6,8],[2,8]],[[2,1],[4,5]]]]
+                [7,[5,[[3,8],[1,4]]]]
+                [[2,[2,2]],[8,[8,1]]]
+                [2,9]
+                [1,[[[9,3],9],[[9,0],[0,7]]]]
+                [[[5,[7,4]],7],1]
+                [[[[4,2],2],6],[8,7]]
+            "};
+
+            let sum: SnailfishNumber = numbers.lines()
+                .map(|line| SnailfishNumber::from_str(line).unwrap())
+                .sum();
+
+            assert_eq!(expected, sum);
+        }
     }
 }

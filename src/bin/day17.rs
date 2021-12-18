@@ -100,16 +100,16 @@ impl TargetArea {
 
         for v_x in v_x_min..=*self.x_range.end() {
             let first_t_in_target =
-                Self::time_to_reach_position(v_x, *self.x_range.start()).ceil() as i32;
+                Self::time_to_reach_x_position(v_x, *self.x_range.start()).ceil() as i32;
 
             // TODO We'll want this later
             let _last_t_in_target = if Self::max_x_distance(v_x) > *self.x_range.end() {
-                Self::time_to_reach_position(v_x, *self.x_range.end()).floor() as i32
+                Self::time_to_reach_x_position(v_x, *self.x_range.end()).floor() as i32
             } else {
                 i32::MAX
             };
 
-            if Self::x_position_after_time(v_x, first_t_in_target) <= *self.x_range.end() {
+            if Self::position_after_time(v_x, first_t_in_target) <= *self.x_range.end() {
                 possible_x_velocities.push(v_x);
             }
         }
@@ -121,11 +121,11 @@ impl TargetArea {
         initial_velocity * (initial_velocity + 1) / 2
     }
 
-    fn x_position_after_time(initial_velocity: i32, time: i32) -> i32 {
+    fn position_after_time(initial_velocity: i32, time: i32) -> i32 {
         Self::max_x_distance(initial_velocity) - Self::max_x_distance(initial_velocity - time)
     }
 
-    fn time_to_reach_position(initial_velocity: i32, position: i32) -> f64 {
+    fn time_to_reach_x_position(initial_velocity: i32, position: i32) -> f64 {
         (((2 * initial_velocity - 1) as f64
             - (((2 * initial_velocity - 1) * (2 * initial_velocity - 1)
                 + 8 * (initial_velocity - position)) as f64)
@@ -134,25 +134,32 @@ impl TargetArea {
             + 1f64
     }
 
+    fn time_to_reach_y_position(initial_velocity: i32, position: i32) -> f64 {
+        (((2 * initial_velocity - 1) as f64
+            + (((2 * initial_velocity - 1) * (2 * initial_velocity - 1)
+                + 8 * (initial_velocity - position)) as f64)
+                .sqrt())
+            / 2f64)
+            + 1f64
+    }
+
     fn possible_y_velocities(&self) -> Vec<i32> {
         let mut possible_y_velocities = Vec::new();
-        let mut initial_velocity = *self.y_range.start() - 1;
 
-        while -initial_velocity >= *self.y_range.start() {
-            initial_velocity += 1;
+        for v_y in *self.y_range.start()..0 {
+            let first_t_in_target =
+                Self::time_to_reach_y_position(v_y, *self.y_range.end()).ceil() as i32;
 
-            let mut velocity = initial_velocity;
-            let mut position = 0;
+            // TODO We'll want this later
+            let _last_t_in_target =
+                Self::time_to_reach_y_position(v_y, *self.y_range.start()).floor() as i32;
 
-            while position >= *self.y_range.start() {
-                position += velocity;
+            if Self::position_after_time(v_y, first_t_in_target) >= *self.y_range.start() {
+                possible_y_velocities.push(v_y);
 
-                if self.y_range.contains(&position) {
-                    possible_y_velocities.push(initial_velocity);
-                    break;
-                }
-
-                velocity -= 1;
+                // For every negative velocity, there's a positive velocity that will "splash" at
+                // the horizon with the same negative velocity
+                possible_y_velocities.push(-v_y - 1);
             }
         }
 
@@ -260,16 +267,27 @@ mod test {
     }
 
     #[test]
-    fn test_time_to_reach_position() {
-        assert_eq!(1, TargetArea::time_to_reach_position(6, 6).ceil() as u32);
-        assert_eq!(2, TargetArea::time_to_reach_position(6, 10).ceil() as u32);
-        assert_eq!(5, TargetArea::time_to_reach_position(6, 20).ceil() as u32);
+    fn test_time_to_reach_x_position() {
+        assert_eq!(1, TargetArea::time_to_reach_x_position(6, 6).ceil() as u32);
+        assert_eq!(2, TargetArea::time_to_reach_x_position(6, 10).ceil() as u32);
+        assert_eq!(5, TargetArea::time_to_reach_x_position(6, 20).ceil() as u32);
     }
 
     #[test]
-    fn test_x_position_after_time() {
-        assert_eq!(0, TargetArea::x_position_after_time(6, 0));
-        assert_eq!(6, TargetArea::x_position_after_time(6, 1));
-        assert_eq!(11, TargetArea::x_position_after_time(6, 2));
+    fn test_time_to_reach_y_position() {
+        assert_eq!(1, TargetArea::time_to_reach_y_position(-1, -1).ceil() as u32);
+        assert_eq!(2, TargetArea::time_to_reach_y_position(-1, -3).ceil() as u32);
+        assert_eq!(5, TargetArea::time_to_reach_y_position(-1, -15).ceil() as u32);
+    }
+
+    #[test]
+    fn test_position_after_time() {
+        assert_eq!(0, TargetArea::position_after_time(6, 0));
+        assert_eq!(6, TargetArea::position_after_time(6, 1));
+        assert_eq!(11, TargetArea::position_after_time(6, 2));
+
+        assert_eq!(0, TargetArea::position_after_time(-1, 0));
+        assert_eq!(-1, TargetArea::position_after_time(-1, 1));
+        assert_eq!(-3, TargetArea::position_after_time(-1, 2));
     }
 }

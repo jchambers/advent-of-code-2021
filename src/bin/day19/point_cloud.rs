@@ -1,6 +1,6 @@
-use std::collections::HashSet;
-use crate::rotation::{ORIENTATIONS, RotationMatrix};
+use crate::rotation::{RotationMatrix, ORIENTATIONS};
 use crate::vector::Vector3d;
+use std::collections::HashSet;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct PointCloud {
@@ -10,21 +10,25 @@ pub struct PointCloud {
 impl PointCloud {
     pub fn translate(&self, delta: Vector3d) -> Self {
         PointCloud {
-            points: self.points.iter()
-                .map(|&point| point + delta)
-                .collect()
+            points: self.points.iter().map(|&point| point + delta).collect(),
         }
     }
 
     pub fn rotate(&self, rotation: &RotationMatrix) -> Self {
         PointCloud {
-            points: self.points.iter()
+            points: self
+                .points
+                .iter()
                 .map(|point| point.rotate(rotation))
-                .collect()
+                .collect(),
         }
     }
 
-    pub fn overlap_transform(&self, other: &PointCloud, n: usize) -> Option<(RotationMatrix, Vector3d)> {
+    pub fn overlap_transform(
+        &self,
+        other: &PointCloud,
+        n: usize,
+    ) -> Option<(RotationMatrix, Vector3d)> {
         let other_point_set = other.points.iter().collect();
 
         for orientation in ORIENTATIONS {
@@ -50,19 +54,32 @@ impl PointCloud {
         None
     }
 
-    pub fn common_points(&self, other: &PointCloud, rotation: &RotationMatrix, translation: Vector3d) -> HashSet<Vector3d> {
-        let transformed_set: HashSet<Vector3d> = self.rotate(rotation).translate(translation).points.into_iter().collect();
+    pub fn common_points(
+        &self,
+        other: &PointCloud,
+        rotation: &RotationMatrix,
+        translation: Vector3d,
+    ) -> HashSet<Vector3d> {
+        let transformed_set: HashSet<Vector3d> = self
+            .rotate(rotation)
+            .translate(translation)
+            .points
+            .into_iter()
+            .collect();
 
-        transformed_set.intersection(&other.points.iter().cloned().collect()).cloned().collect()
+        transformed_set
+            .intersection(&other.points.iter().cloned().collect())
+            .cloned()
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
     use crate::point_cloud::PointCloud;
     use crate::rotation::ORIENTATIONS;
     use crate::vector::Vector3d;
+    use std::collections::HashSet;
 
     #[test]
     fn test_translate() {
@@ -80,7 +97,8 @@ mod test {
                     Vector3d::new(2, 2, 2),
                     Vector3d::new(3, 3, 3),
                 ],
-            }.translate(Vector3d::new(1, 2, 3))
+            }
+            .translate(Vector3d::new(1, 2, 3))
         )
     }
 
@@ -100,7 +118,8 @@ mod test {
                     Vector3d::new(0, 1, 0),
                     Vector3d::new(0, 0, 1),
                 ],
-            }.rotate(&ORIENTATIONS[1])
+            }
+            .rotate(&ORIENTATIONS[1])
         )
     }
 
@@ -122,13 +141,17 @@ mod test {
             ],
         };
 
-        let (rotation, translation) = scanner_1_cloud.overlap_transform(&scanner_0_cloud, 3).unwrap();
+        let (rotation, translation) = scanner_1_cloud
+            .overlap_transform(&scanner_0_cloud, 3)
+            .unwrap();
 
         // In this example, no rotation should be required
         assert_eq!(ORIENTATIONS[0], rotation);
         assert_eq!(Vector3d::new(5, 2, 0), translation);
 
-        assert!(scanner_1_cloud.overlap_transform(&scanner_0_cloud, 4).is_none());
+        assert!(scanner_1_cloud
+            .overlap_transform(&scanner_0_cloud, 4)
+            .is_none());
     }
 
     #[test]
@@ -206,11 +229,18 @@ mod test {
             Vector3d::new(-345, -311, 381),
             Vector3d::new(459, -707, 401),
             Vector3d::new(-485, -357, 347),
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
 
-        let (rotation, translation) = scanner_1_cloud.overlap_transform(&scanner_0_cloud, 12).unwrap();
+        let (rotation, translation) = scanner_1_cloud
+            .overlap_transform(&scanner_0_cloud, 12)
+            .unwrap();
 
         assert_eq!(Vector3d::new(68, -1246, -43), translation);
-        assert_eq!(expected_common_points, scanner_1_cloud.common_points(&scanner_0_cloud, &rotation, translation));
+        assert_eq!(
+            expected_common_points,
+            scanner_1_cloud.common_points(&scanner_0_cloud, &rotation, translation)
+        );
     }
 }

@@ -1,3 +1,4 @@
+mod point_cloud;
 mod rotation;
 mod vector;
 

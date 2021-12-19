@@ -2,12 +2,16 @@ use std::ops::{Add, Sub};
 use std::str::FromStr;
 use crate::rotation::RotationMatrix;
 
-#[derive(Debug, Eq, PartialEq)]
-struct Vector3d {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Vector3d {
     components: [i32; 3],
 }
 
 impl Vector3d {
+    pub fn new(x: i32, y: i32, z: i32) -> Self {
+        Vector3d { components: [x, y, z] }
+    }
+
     pub fn rotate(&self, rotation: &RotationMatrix) -> Self {
         Vector3d { components: rotation.apply(&self.components) }
     }

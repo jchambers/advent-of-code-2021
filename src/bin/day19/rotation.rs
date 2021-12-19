@@ -44,11 +44,7 @@ impl RotationMatrix {
                     sin(z) * sin(y) * sin(x) + cos(z) * cos(x),
                     sin(z) * sin(y) * cos(x) - cos(z) * sin(x),
                 ],
-                [
-                    -sin(y),
-                    cos(y) * sin(x),
-                    cos(y) * cos(x)
-                ],
+                [-sin(y), cos(y) * sin(x), cos(y) * cos(x)],
             ],
         }
     }
@@ -84,8 +80,8 @@ const fn cos(half_pi: u32) -> i32 {
 
 #[cfg(test)]
 mod test {
+    use crate::rotation::{RotationMatrix, ORIENTATIONS};
     use std::collections::HashSet;
-    use crate::rotation::{ORIENTATIONS, RotationMatrix};
 
     #[test]
     fn test_distinct_orientations() {

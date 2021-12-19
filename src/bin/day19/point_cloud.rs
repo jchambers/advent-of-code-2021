@@ -40,13 +40,17 @@ pub struct PointCloud {
 }
 
 impl PointCloud {
-    pub fn translate(&self, delta: Vector3d) -> Self {
+    pub fn transform(&self, rotation: &RotationMatrix, translation: Vector3d) -> Self {
+        self.rotate(rotation).translate(translation)
+    }
+
+    fn translate(&self, delta: Vector3d) -> Self {
         PointCloud {
             points: self.points.iter().map(|&point| point + delta).collect(),
         }
     }
 
-    pub fn rotate(&self, rotation: &RotationMatrix) -> Self {
+    fn rotate(&self, rotation: &RotationMatrix) -> Self {
         PointCloud {
             points: self
                 .points
@@ -86,23 +90,8 @@ impl PointCloud {
         None
     }
 
-    pub fn common_points(
-        &self,
-        other: &PointCloud,
-        rotation: &RotationMatrix,
-        translation: Vector3d,
-    ) -> HashSet<Vector3d> {
-        let transformed_set: HashSet<Vector3d> = self
-            .rotate(rotation)
-            .translate(translation)
-            .points
-            .into_iter()
-            .collect();
-
-        transformed_set
-            .intersection(&other.points.iter().cloned().collect())
-            .cloned()
-            .collect()
+    pub fn points(&self) -> Vec<Vector3d> {
+        self.points.clone()
     }
 }
 
@@ -225,9 +214,21 @@ mod test {
             .unwrap();
 
         assert_eq!(Vector3d::new(68, -1246, -43), translation);
-        assert_eq!(
-            expected_common_points,
-            point_clouds[1].common_points(&point_clouds[0], &rotation, translation)
-        );
+
+        let common_points: HashSet<Vector3d> = point_clouds[0]
+            .points()
+            .into_iter()
+            .collect::<HashSet<Vector3d>>()
+            .intersection(
+                &point_clouds[1]
+                    .transform(&rotation, translation)
+                    .points()
+                    .into_iter()
+                    .collect::<HashSet<Vector3d>>(),
+            )
+            .cloned()
+            .collect();
+
+        assert_eq!(expected_common_points, common_points);
     }
 }

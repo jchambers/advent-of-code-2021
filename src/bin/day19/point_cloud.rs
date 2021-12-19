@@ -111,7 +111,6 @@ mod test {
     use crate::point_cloud::{from_lines, PointCloud};
     use crate::rotation::ORIENTATIONS;
     use crate::vector::Vector3d;
-    use indoc::indoc;
     use std::collections::HashSet;
 
     const TEST_SCANNER_STRING: &str = include_str!("test_points.txt");

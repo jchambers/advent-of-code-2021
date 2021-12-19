@@ -2,7 +2,7 @@ use std::ops::{Add, Sub};
 use std::str::FromStr;
 use crate::rotation::RotationMatrix;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Vector3d {
     components: [i32; 3],
 }

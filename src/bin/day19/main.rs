@@ -5,6 +5,7 @@ mod vector;
 use crate::point_cloud::PointCloud;
 use crate::rotation::{RotationMatrix, ORIENTATIONS};
 use crate::vector::Vector3d;
+use std::cmp::max;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufRead;
@@ -14,10 +15,21 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let _point_clouds = point_cloud::from_lines(
+        let point_clouds = point_cloud::from_lines(
             io::BufReader::new(File::open(path)?)
                 .lines()
                 .map(|line| line.unwrap()),
+        )
+        .unwrap();
+
+        println!(
+            "Distinct beacons: {}",
+            distinct_beacons(&point_clouds).len()
+        );
+
+        println!(
+            "Max distance between sensors: {}",
+            max_sensor_distance(&point_clouds)
         );
 
         Ok(())
@@ -71,6 +83,23 @@ fn distinct_beacons(point_clouds: &Vec<PointCloud>) -> HashSet<Vector3d> {
     }
 
     distinct_beacons
+}
+
+fn max_sensor_distance(point_clouds: &Vec<PointCloud>) -> u32 {
+    let positions: Vec<Vector3d> = align_point_clouds(point_clouds)
+        .iter()
+        .map(|(_, translation)| *translation)
+        .collect();
+
+    let mut max_distance = 0;
+
+    for i in 0..positions.len() - 1 {
+        for j in i..positions.len() {
+            max_distance = max(max_distance, positions[i].manhattan_distance(&positions[j]));
+        }
+    }
+
+    max_distance
 }
 
 #[cfg(test)]
@@ -185,5 +214,14 @@ mod test {
                 .unwrap();
 
         assert_eq!(expected_beacons, distinct_beacons(&point_clouds));
+    }
+
+    #[test]
+    fn test_max_sensor_distance() {
+        let point_clouds =
+            point_cloud::from_lines(TEST_SCANNER_STRING.lines().map(|line| String::from(line)))
+                .unwrap();
+
+        assert_eq!(3621, max_sensor_distance(&point_clouds));
     }
 }

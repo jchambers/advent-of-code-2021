@@ -19,6 +19,14 @@ impl Vector3d {
             components: rotation.apply(&self.components),
         }
     }
+
+    pub fn manhattan_distance(&self, other: &Vector3d) -> u32 {
+        (self.clone() - other.clone())
+            .components
+            .iter()
+            .map(|&component| i32::abs(component) as u32)
+            .sum()
+    }
 }
 
 impl FromStr for Vector3d {
@@ -118,5 +126,14 @@ mod test {
             }
             .rotate(&ORIENTATIONS[1])
         );
+    }
+
+    #[test]
+    fn test_manhattan_distance() {
+        let a = Vector3d::new(1105, -1205, 1229);
+        let b = Vector3d::new(-92, -2380, -20);
+
+        assert_eq!(3621, a.manhattan_distance(&b));
+        assert_eq!(3621, b.manhattan_distance(&a));
     }
 }

@@ -1,4 +1,5 @@
 mod rotation;
+mod vector;
 
 use std::{env, error, io};
 use std::fs::File;

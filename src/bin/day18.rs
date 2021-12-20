@@ -122,14 +122,12 @@ impl SnailfishNumber {
 
     fn reduce(&mut self) {
         loop {
-            if let Some(_) = self.try_explode(0) {
+            if self.try_explode(0).is_some() {
+                continue;
+            } else if self.try_split() {
                 continue;
             } else {
-                if self.try_split() {
-                    continue;
-                } else {
-                    break;
-                }
+                break;
             }
         }
     }
@@ -268,7 +266,7 @@ impl Sum for SnailfishNumber {
     fn sum<I: Iterator<Item=Self>>(mut iter: I) -> Self {
         let mut sum = iter.next().unwrap();
 
-        while let Some(next) = iter.next() {
+        for next in iter {
             sum = sum + next;
         }
 

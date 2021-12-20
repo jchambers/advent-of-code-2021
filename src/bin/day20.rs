@@ -1,16 +1,24 @@
-use std::{env, error};
+use self::Pixel::{Dark, Light};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use self::Pixel::{Dark, Light};
+use std::{env, error};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let (algorithm, image) = algorithm_and_image_from_str(std::fs::read_to_string(path)?.as_str()).unwrap();
+        let (algorithm, image) =
+            algorithm_and_image_from_str(std::fs::read_to_string(path)?.as_str()).unwrap();
 
-        println!("Light pixels in enhanced image after 2 steps: {}", image.enhance(&algorithm, 2).light_pixel_count());
-        println!("Light pixels in enhanced image after 50 steps: {}", image.enhance(&algorithm, 50).light_pixel_count());
+        println!(
+            "Light pixels in enhanced image after 2 steps: {}",
+            image.enhance(&algorithm, 2).light_pixel_count()
+        );
+
+        println!(
+            "Light pixels in enhanced image after 50 steps: {}",
+            image.enhance(&algorithm, 50).light_pixel_count()
+        );
 
         Ok(())
     } else {
@@ -18,7 +26,9 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-fn algorithm_and_image_from_str(string: &str) -> Result<(EnhancementAlgorithm, Image), Box<dyn error::Error>> {
+fn algorithm_and_image_from_str(
+    string: &str,
+) -> Result<(EnhancementAlgorithm, Image), Box<dyn error::Error>> {
     let mut pieces = string.splitn(2, "\n\n");
 
     let enhancement_algorithm = EnhancementAlgorithm::from_str(pieces.next().unwrap())?;
@@ -49,11 +59,12 @@ impl FromStr for EnhancementAlgorithm {
     type Err = Box<dyn error::Error>;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        let rules = string.chars()
+        let rules = string
+            .chars()
             .map(|c| match c {
                 '#' => Light,
                 '.' => Dark,
-                _ => unreachable!()
+                _ => unreachable!(),
             })
             .collect::<Vec<Pixel>>()
             .try_into()
@@ -94,8 +105,8 @@ impl Image {
                 // Note that x and y here correspond to positions in the enhanced image, which will
                 // be offset by 1 in each direction within this image (i.e. we're adding a border of
                 // 1 pixel the whole way around).
-                enhanced_pixels[(y * enhanced_width) + x] =
-                    enhancement_algorithm.pixel(self.enhancement_index(x as isize - 1, y as isize - 1));
+                enhanced_pixels[(y * enhanced_width) + x] = enhancement_algorithm
+                    .pixel(self.enhancement_index(x as isize - 1, y as isize - 1));
             }
         }
 
@@ -115,9 +126,7 @@ impl Image {
     pub fn light_pixel_count(&self) -> usize {
         match self.infinite_pixel {
             Light => usize::MAX,
-            Dark => self.pixels.iter()
-                .filter(|pixel| pixel == &&Light)
-                .count()
+            Dark => self.pixels.iter().filter(|pixel| pixel == &&Light).count(),
         }
     }
 
@@ -150,10 +159,14 @@ impl Display for Image {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for y in 0..self.height {
             for x in 0..self.width {
-                write!(f, "{}", match self.pixel(x as isize, y as isize) {
-                    Light => "█",
-                    Dark => " ",
-                })?;
+                write!(
+                    f,
+                    "{}",
+                    match self.pixel(x as isize, y as isize) {
+                        Light => "█",
+                        Dark => " ",
+                    }
+                )?;
             }
 
             writeln!(f)?;
@@ -167,7 +180,8 @@ impl FromStr for Image {
     type Err = Box<dyn error::Error>;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        let pixels: Vec<Pixel> = string.chars()
+        let pixels: Vec<Pixel> = string
+            .chars()
             .filter_map(|c| match c {
                 '#' => Some(Light),
                 '.' => Some(Dark),
@@ -184,7 +198,7 @@ impl FromStr for Image {
                 width,
                 height,
                 pixels,
-                infinite_pixel: Dark
+                infinite_pixel: Dark,
             })
         } else {
             Err("Bad image string length".into())
@@ -194,10 +208,10 @@ impl FromStr for Image {
 
 #[cfg(test)]
 mod test {
-    use indoc::indoc;
     use super::*;
+    use indoc::indoc;
 
-    const TEST_IMAGE_STRING: &str = indoc!{"
+    const TEST_IMAGE_STRING: &str = indoc! {"
         #..#.
         #....
         ##..#
@@ -205,12 +219,13 @@ mod test {
         ..###
     "};
 
-    const TEST_ALGORITHM_STRING: &str = "..#.#..#####.#.#.#.###.##.....###.##.#..###.####..#####..#\
-    ....#..#..##..###..######.###...####..#..#####..##..#.#####...##.#.#..#.##..#.#......#.###.####\
-    ##.###.####...#.##.##..#..#..#####.....#.#....###..#.##......#.....#..#..#..##..#...##.######.#\
-    ###.####.#.#...#.......#..#.#.#...####.##.#......#..#...##.#.##..#...##.#.##..###.#......#.#...\
-    ....#.#.#.####.###.##...#.....####.#..#..#.##.#....##..#.####....##...##..#...#......#.#.......\
-    #.......##..####..#...#.#.#...##..#.#..###..#####........#..####......#..#";
+    const TEST_ALGORITHM_STRING: &str =
+        "..#.#..#####.#.#.#.###.##.....###.##.#..###.####..#####..#....#..#..##..###..######.###...\
+        ####..#..#####..##..#.#####...##.#.#..#.##..#.#......#.###.######.###.####...#.##.##..#..#.\
+        .#####.....#.#....###..#.##......#.....#..#..#..##..#...##.######.####.####.#.#...#.......#\
+        ..#.#.#...####.##.#......#..#...##.#.##..#...##.#.##..###.#......#.#.......#.#.#.####.###.#\
+        #...#.....####.#..#..#.##.#....##..#.####....##...##..#...#......#.#.......#.......##..####\
+        ..#...#.#.#...##..#.#..###..#####........#..####......#..#";
 
     #[test]
     fn test_enhancement_algorithm_from_string() {
@@ -236,7 +251,9 @@ mod test {
         assert_eq!(5, image.height);
         assert_eq!(Dark, image.infinite_pixel);
 
-        assert!(image.pixels.starts_with(&[Light, Dark, Dark, Light, Dark, Light, Dark]));
+        assert!(image
+            .pixels
+            .starts_with(&[Light, Dark, Dark, Light, Dark, Light, Dark]));
     }
 
     #[test]
@@ -263,9 +280,11 @@ mod test {
     #[test]
     fn test_enhance() {
         let enhancement_algorithm = EnhancementAlgorithm::from_str(TEST_ALGORITHM_STRING).unwrap();
-        let enhanced_image = Image::from_str(TEST_IMAGE_STRING).unwrap().enhance(&enhancement_algorithm, 1);
+        let enhanced_image = Image::from_str(TEST_IMAGE_STRING)
+            .unwrap()
+            .enhance(&enhancement_algorithm, 1);
 
-        let expected_enhanced_image = Image::from_str(indoc!{"
+        let expected_enhanced_image = Image::from_str(indoc! {"
             .##.##.
             #..#.#.
             ##.#..#
@@ -273,7 +292,8 @@ mod test {
             .#..##.
             ..##..#
             ...#.#.
-        "}).unwrap();
+        "})
+        .unwrap();
 
         assert_eq!(expected_enhanced_image, enhanced_image);
     }

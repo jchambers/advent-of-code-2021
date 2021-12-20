@@ -1,0 +1,18 @@
+There's something tricky here: the infinite sea of pixels isn't guaranteed to be dark. In fact, if algorithm[0] is Light
+and algorithm[511] is Dark, then the sea will "flash." What happens at the corners in this case?
+
+Round 0 (sea is dark):
+
+      ....    1221
+## -> .##. -> 1221
+      ....    1221
+
+Everything beyond the expanded zone is 0; let's say 0, 1 -> Light, 2 -> Dark.
+
+Round 1 (sea is now light):
+
+        ######    987789
+#..#    ##..##    975579
+#..# -> ##..## -> 963369
+#..#    ##..##    975579
+        ######    987789

@@ -1,5 +1,4 @@
 use self::Pixel::{Dark, Light};
-use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::{env, error};
 
@@ -152,27 +151,6 @@ impl Image {
         }
 
         index
-    }
-}
-
-impl Display for Image {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                write!(
-                    f,
-                    "{}",
-                    match self.pixel(x as isize, y as isize) {
-                        Light => "█",
-                        Dark => " ",
-                    }
-                )?;
-            }
-
-            writeln!(f)?;
-        }
-
-        Ok(())
     }
 }
 

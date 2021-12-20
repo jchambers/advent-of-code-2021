@@ -9,11 +9,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     if let Some(path) = args.get(1) {
         let (algorithm, image) = algorithm_and_image_from_str(std::fs::read_to_string(path)?.as_str()).unwrap();
 
-        // Yes, we could make `enhance` take a "number of levels" argument, but I think it's
-        // important to say "enhance" and push a bunch of buttons at each phase. For credibility,
-        // y'know.
-        let enhanced = image.enhance(&algorithm).enhance(&algorithm);
-        println!("Light pixels in enhanced image: {}", enhanced.light_pixel_count());
+        println!("Light pixels in enhanced image after 2 steps: {}", image.enhance(&algorithm, 2).light_pixel_count());
+        println!("Light pixels in enhanced image after 50 steps: {}", image.enhance(&algorithm, 50).light_pixel_count());
 
         Ok(())
     } else {
@@ -66,7 +63,7 @@ impl FromStr for EnhancementAlgorithm {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Image {
     width: usize,
     height: usize,
@@ -76,7 +73,17 @@ struct Image {
 }
 
 impl Image {
-    pub fn enhance(&self, enhancement_algorithm: &EnhancementAlgorithm) -> Self {
+    pub fn enhance(&self, enhancement_algorithm: &EnhancementAlgorithm, levels: usize) -> Self {
+        let mut enhanced = self.clone();
+
+        for _ in 0..levels {
+            enhanced = enhanced.next(&enhancement_algorithm);
+        }
+
+        enhanced
+    }
+
+    fn next(&self, enhancement_algorithm: &EnhancementAlgorithm) -> Self {
         let mut enhanced_pixels = vec![Dark; (self.width + 2) * (self.height + 2)];
 
         let enhanced_width = self.width + 2;
@@ -256,7 +263,7 @@ mod test {
     #[test]
     fn test_enhance() {
         let enhancement_algorithm = EnhancementAlgorithm::from_str(TEST_ALGORITHM_STRING).unwrap();
-        let enhanced_image = Image::from_str(TEST_IMAGE_STRING).unwrap().enhance(&enhancement_algorithm);
+        let enhanced_image = Image::from_str(TEST_IMAGE_STRING).unwrap().enhance(&enhancement_algorithm, 1);
 
         let expected_enhanced_image = Image::from_str(indoc!{"
             .##.##.
@@ -274,8 +281,9 @@ mod test {
     #[test]
     fn test_light_pixel_count() {
         let enhancement_algorithm = EnhancementAlgorithm::from_str(TEST_ALGORITHM_STRING).unwrap();
-        let enhanced_image = Image::from_str(TEST_IMAGE_STRING).unwrap().enhance(&enhancement_algorithm).enhance(&enhancement_algorithm);
+        let image = Image::from_str(TEST_IMAGE_STRING).unwrap();
 
-        assert_eq!(35, enhanced_image.light_pixel_count());
+        assert_eq!(35, image.enhance(&enhancement_algorithm, 2).light_pixel_count());
+        assert_eq!(3351, image.enhance(&enhancement_algorithm, 50).light_pixel_count());
     }
 }

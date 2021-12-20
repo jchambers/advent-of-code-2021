@@ -21,7 +21,7 @@ impl Vector3d {
     }
 
     pub fn manhattan_distance(&self, other: &Vector3d) -> u32 {
-        (self.clone() - other.clone())
+        (*self - *other)
             .components
             .iter()
             .map(|&component| i32::abs(component) as u32)
@@ -34,7 +34,7 @@ impl FromStr for Vector3d {
 
     fn from_str(line: &str) -> Result<Self, Self::Err> {
         let components: Vec<i32> = line
-            .split(",")
+            .split(',')
             .map(|component| i32::from_str(component))
             .collect::<Result<Vec<i32>, _>>()?;
 

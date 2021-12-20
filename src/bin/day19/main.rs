@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-fn align_point_clouds(point_clouds: &Vec<PointCloud>) -> Vec<(RotationMatrix, Vector3d)> {
+fn align_point_clouds(point_clouds: &[PointCloud]) -> Vec<(RotationMatrix, Vector3d)> {
     let mut transformations = vec![None; point_clouds.len()];
 
     // Treat the first point cloud as our origin in terms of both position and orientation
@@ -73,7 +73,7 @@ fn align_point_clouds(point_clouds: &Vec<PointCloud>) -> Vec<(RotationMatrix, Ve
         .collect()
 }
 
-fn distinct_beacons(point_clouds: &Vec<PointCloud>) -> HashSet<Vector3d> {
+fn distinct_beacons(point_clouds: &[PointCloud]) -> HashSet<Vector3d> {
     let transformations = align_point_clouds(point_clouds);
 
     let mut distinct_beacons = HashSet::new();
@@ -85,7 +85,7 @@ fn distinct_beacons(point_clouds: &Vec<PointCloud>) -> HashSet<Vector3d> {
     distinct_beacons
 }
 
-fn max_sensor_distance(point_clouds: &Vec<PointCloud>) -> u32 {
+fn max_sensor_distance(point_clouds: &[PointCloud]) -> u32 {
     let positions: Vec<Vector3d> = align_point_clouds(point_clouds)
         .iter()
         .map(|(_, translation)| *translation)
@@ -111,7 +111,7 @@ mod test {
     #[test]
     fn test_align_point_clouds() {
         let point_clouds =
-            point_cloud::from_lines(TEST_SCANNER_STRING.lines().map(|line| String::from(line)))
+            point_cloud::from_lines(TEST_SCANNER_STRING.lines().map(String::from))
                 .unwrap();
 
         let transformations = align_point_clouds(&point_clouds);
@@ -210,7 +210,7 @@ mod test {
         .collect();
 
         let point_clouds =
-            point_cloud::from_lines(TEST_SCANNER_STRING.lines().map(|line| String::from(line)))
+            point_cloud::from_lines(TEST_SCANNER_STRING.lines().map(String::from))
                 .unwrap();
 
         assert_eq!(expected_beacons, distinct_beacons(&point_clouds));
@@ -219,7 +219,7 @@ mod test {
     #[test]
     fn test_max_sensor_distance() {
         let point_clouds =
-            point_cloud::from_lines(TEST_SCANNER_STRING.lines().map(|line| String::from(line)))
+            point_cloud::from_lines(TEST_SCANNER_STRING.lines().map(String::from))
                 .unwrap();
 
         assert_eq!(3621, max_sensor_distance(&point_clouds));

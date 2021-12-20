@@ -108,7 +108,7 @@ mod test {
     fn test_from_lines() {
         assert_eq!(
             5,
-            from_lines(TEST_SCANNER_STRING.lines().map(|line| String::from(line)))
+            from_lines(TEST_SCANNER_STRING.lines().map(String::from))
                 .unwrap()
                 .len()
         );
@@ -190,7 +190,7 @@ mod test {
     #[test]
     fn test_overlap_transform_3d() {
         let point_clouds =
-            from_lines(TEST_SCANNER_STRING.lines().map(|line| String::from(line))).unwrap();
+            from_lines(TEST_SCANNER_STRING.lines().map(String::from)).unwrap();
 
         let expected_common_points: HashSet<Vector3d> = vec![
             Vector3d::new(-618, -824, -621),

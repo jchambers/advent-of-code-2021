@@ -87,7 +87,7 @@ impl Image {
         let mut enhanced = self.clone();
 
         for _ in 0..levels {
-            enhanced = enhanced.next(&enhancement_algorithm);
+            enhanced = enhanced.next(enhancement_algorithm);
         }
 
         enhanced

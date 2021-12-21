@@ -63,6 +63,9 @@ name = "day19"
 [[bin]]
 name = "day20"
 
+[[bin]]
+name = "day21"
+
 [dependencies]
 hex = "0.4.3"
 

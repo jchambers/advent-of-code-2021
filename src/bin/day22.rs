@@ -158,7 +158,7 @@ impl Cuboid {
 
         // Generally speaking, we can represent the difference between two cuboids with at most six
         // new cuboids. If we imagine taking a "core" out of the middle of a cuboid, we can
-        // represent the difference as a "roof," a "ceiling," and four walls (left, right, front,
+        // represent the difference as a "roof," a "ceiling," and four "walls" (left, right, front,
         // and back). Some—or all—of those may not be present.
         //
         // Let's say +x is to the right, +y is up, and +z is out of the screen toward the reader.

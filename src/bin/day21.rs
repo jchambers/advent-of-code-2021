@@ -1,7 +1,7 @@
-use std::str::FromStr;
-use std::{env, error};
 use std::cmp::max;
 use std::collections::VecDeque;
+use std::str::FromStr;
+use std::{env, error};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -79,15 +79,8 @@ fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
 }
 
 fn play_quantum_game(p1_position: u32, p2_position: u32) -> u64 {
-    const ROLLS_AND_FREQUENCIES: [(u32, u64); 7] = [
-        (3, 1),
-        (4, 3),
-        (5, 6),
-        (6, 7),
-        (7, 6),
-        (8, 3),
-        (9, 1),
-    ];
+    const ROLLS_AND_FREQUENCIES: [(u32, u64); 7] =
+        [(3, 1), (4, 3), (5, 6), (6, 7), (7, 6), (8, 3), (9, 1)];
 
     let mut wins = [0, 0];
     let mut state_queue = VecDeque::new();

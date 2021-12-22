@@ -42,11 +42,11 @@ impl GameState {
     }
 
     pub fn advance(&self, roll_total: u32) -> Self {
-        let mut updated_positions = self.positions.clone();
+        let mut updated_positions = self.positions;
         updated_positions[self.active_player] += roll_total;
         updated_positions[self.active_player] %= 10;
 
-        let mut updated_scores = self.scores.clone();
+        let mut updated_scores = self.scores;
         updated_scores[self.active_player] += updated_positions[self.active_player] + 1;
 
         GameState {

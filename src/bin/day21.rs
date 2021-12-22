@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
         Ok(())
     } else {
-        Err("Usage: day15 P1_START P2_START".into())
+        Err("Usage: day21 P1_START P2_START".into())
     }
 }
 

@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Cuboid {
     x: CoordinateRange,
     y: CoordinateRange,
@@ -65,7 +65,7 @@ impl Cuboid {
 
     pub fn subtract(&self, other: &Cuboid) -> Vec<Cuboid> {
         if !self.intersects(other) {
-            return vec![self.clone()];
+            return vec![*self];
         }
 
         // Generally speaking, we can represent the difference between two cuboids with at most six
@@ -172,7 +172,7 @@ impl Cuboid {
 
             union
         } else {
-            vec![self.clone(), other.clone()]
+            vec![*self, *other]
         }
     }
 }
@@ -374,7 +374,7 @@ mod test {
         };
 
         for corner_cut in CORNER_CUTS {
-            assert_eq!(Some(corner_cut.clone()), original.intersection(&corner_cut));
+            assert_eq!(Some(corner_cut), original.intersection(&corner_cut));
         }
 
         assert!(original
@@ -397,7 +397,7 @@ mod test {
         assert_eq!(27, original.volume());
 
         assert_eq!(
-            vec![original.clone()],
+            vec![original],
             original.subtract(&Cuboid {
                 x: CoordinateRange { start: 2, end: 2 },
                 y: CoordinateRange { start: 2, end: 2 },

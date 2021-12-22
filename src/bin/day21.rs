@@ -5,13 +5,13 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() == 3 {
-        let game = DiceGame::new(
-            u32::from_str(args[1].as_str())?,
-            u32::from_str(args[2].as_str())?,
-            DeterministicDie::new(),
-        );
+        let p1_position = u32::from_str(args[1].as_str())?;
+        let p2_position = u32::from_str(args[2].as_str())?;
 
-        println!("Outcome with deterministic die: {}", game.play());
+        println!(
+            "Outcome with deterministic die: {}",
+            play_deterministic_game(p1_position, p2_position)
+        );
 
         Ok(())
     } else {
@@ -19,44 +19,52 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-trait Die {
-    fn roll(&mut self) -> u32;
-    fn roll_count(&self) -> u32;
+struct GameState {
+    active_player: usize,
+    positions: [u32; 2],
+    scores: [u32; 2],
 }
 
-struct DiceGame<'a> {
-    die: Box<dyn Die + 'a>,
-    player_positions: [u32; 2],
-    player_scores: [u32; 2],
-}
-
-impl<'a> DiceGame<'a> {
-    pub fn new(p1_position: u32, p2_position: u32, die: impl Die + 'a) -> Self {
-        DiceGame {
-            die: Box::new(die),
-            player_positions: [p1_position - 1, p2_position - 1],
-            player_scores: [0; 2],
+impl GameState {
+    pub fn new(p1_position: u32, p2_position: u32) -> Self {
+        GameState {
+            active_player: 0,
+            positions: [p1_position - 1, p2_position - 1],
+            scores: [0, 0],
         }
     }
 
-    pub fn play(mut self) -> u32 {
-        let mut turn = 0;
+    pub fn advance(&self, roll_total: u32) -> Self {
+        let mut updated_positions = self.positions.clone();
+        updated_positions[self.active_player] += roll_total;
+        updated_positions[self.active_player] %= 10;
 
-        while *self.player_scores.iter().max().unwrap() < 1_000 {
-            let current_player = turn % 2;
+        let mut updated_scores = self.scores.clone();
+        updated_scores[self.active_player] += updated_positions[self.active_player] + 1;
 
-            for _ in 0..3 {
-                self.player_positions[current_player] += self.die.roll();
-            }
+        GameState {
+            active_player: self.active_player ^ 1,
+            positions: updated_positions,
+            scores: updated_scores,
+        }
+    }
+}
 
-            self.player_positions[current_player] %= 10;
-            self.player_scores[current_player] += self.player_positions[current_player] + 1;
+fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
+    let mut game_state = GameState::new(p1_position, p2_position);
+    let mut die = DeterministicDie::new();
 
-            turn += 1;
+    while *game_state.scores.iter().max().unwrap() < 1_000 {
+        let mut roll_total = 0;
+
+        for _ in 0..3 {
+            roll_total += die.roll();
         }
 
-        *self.player_scores.iter().min().unwrap() * self.die.roll_count()
+        game_state = game_state.advance(roll_total);
     }
+
+    *game_state.scores.iter().min().unwrap() * die.roll_count()
 }
 
 struct DeterministicDie {
@@ -67,9 +75,7 @@ impl DeterministicDie {
     pub fn new() -> Self {
         DeterministicDie { roll_count: 0 }
     }
-}
 
-impl Die for DeterministicDie {
     fn roll(&mut self) -> u32 {
         let roll = (self.roll_count % 100) + 1;
         self.roll_count += 1;
@@ -99,8 +105,7 @@ mod test {
     }
 
     #[test]
-    fn test_game_with_deterministic_die() {
-        let game = DiceGame::new(4, 8, DeterministicDie::new());
-        assert_eq!(739785, game.play());
+    fn test_play_deterministic_game() {
+        assert_eq!(739785, play_deterministic_game(4, 8));
     }
 }

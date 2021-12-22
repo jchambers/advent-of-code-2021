@@ -1,5 +1,7 @@
 use std::str::FromStr;
 use std::{env, error};
+use std::cmp::max;
+use std::collections::VecDeque;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -11,6 +13,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         println!(
             "Outcome with deterministic die: {}",
             play_deterministic_game(p1_position, p2_position)
+        );
+
+        println!(
+            "Outcome with quantum die: {}",
+            play_quantum_game(p1_position, p2_position)
         );
 
         Ok(())
@@ -48,13 +55,17 @@ impl GameState {
             scores: updated_scores,
         }
     }
+
+    pub fn max_score(&self) -> u32 {
+        max(self.scores[0], self.scores[1])
+    }
 }
 
 fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
     let mut game_state = GameState::new(p1_position, p2_position);
     let mut die = DeterministicDie::new();
 
-    while *game_state.scores.iter().max().unwrap() < 1_000 {
+    while game_state.max_score() < 1_000 {
         let mut roll_total = 0;
 
         for _ in 0..3 {
@@ -65,6 +76,37 @@ fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
     }
 
     *game_state.scores.iter().min().unwrap() * die.roll_count()
+}
+
+fn play_quantum_game(p1_position: u32, p2_position: u32) -> u64 {
+    const ROLLS_AND_FREQUENCIES: [(u32, u64); 7] = [
+        (3, 1),
+        (4, 3),
+        (5, 6),
+        (6, 7),
+        (7, 6),
+        (8, 3),
+        (9, 1),
+    ];
+
+    let mut wins = [0, 0];
+    let mut state_queue = VecDeque::new();
+
+    state_queue.push_back((GameState::new(p1_position, p2_position), 1));
+
+    while let Some((state, paths_to_state)) = state_queue.pop_front() {
+        for (roll, frequency) in ROLLS_AND_FREQUENCIES {
+            let next_state = state.advance(roll);
+
+            if next_state.max_score() >= 21 {
+                wins[next_state.active_player ^ 1] += paths_to_state * frequency
+            } else {
+                state_queue.push_back((next_state, paths_to_state * frequency))
+            }
+        }
+    }
+
+    max(wins[0], wins[1])
 }
 
 struct DeterministicDie {
@@ -107,5 +149,10 @@ mod test {
     #[test]
     fn test_play_deterministic_game() {
         assert_eq!(739785, play_deterministic_game(4, 8));
+    }
+
+    #[test]
+    fn test_play_quantum_game() {
+        assert_eq!(444356092776315, play_quantum_game(4, 8));
     }
 }

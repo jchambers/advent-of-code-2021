@@ -37,12 +37,9 @@ impl Cuboid {
     }
 
     fn intersection(&self, other: &Cuboid) -> Option<Cuboid> {
-        if self.x.start <= other.x.end
-            && self.x.end >= other.x.start
-            && self.x.start <= other.x.end
-            && self.x.end >= other.x.start
-            && self.x.start <= other.x.end
-            && self.x.end >= other.x.start
+        if self.x.start <= other.x.end && self.x.end >= other.x.start
+            && self.y.start <= other.y.end && self.y.end >= other.y.start
+            && self.z.start <= other.z.end && self.z.end >= other.z.start
         {
             Some(Cuboid {
                 x: CoordinateRange {
@@ -373,6 +370,33 @@ mod test {
             }
             .volume()
         );
+    }
+
+    #[test]
+    fn test_intersects() {
+        let query_cuboid = Cuboid {
+            x: CoordinateRange { start: 10, end: 10 },
+            y: CoordinateRange { start: 10, end: 10 },
+            z: CoordinateRange { start: 10, end: 10 },
+        };
+
+        assert!(!query_cuboid.intersects(&Cuboid {
+            x: CoordinateRange { start: 10, end: 11 },
+            y: CoordinateRange { start: 10, end: 10 },
+            z: CoordinateRange { start: 12, end: 12 }
+        }));
+
+        assert!(!query_cuboid.intersects(&Cuboid {
+            x: CoordinateRange { start: 10, end: 10 },
+            y: CoordinateRange { start: 12, end: 12 },
+            z: CoordinateRange { start: 10, end: 12 }
+        }));
+
+        assert!(!query_cuboid.intersects(&Cuboid {
+            x: CoordinateRange { start: 10, end: 10 },
+            y: CoordinateRange { start: 11, end: 11 },
+            z: CoordinateRange { start: 12, end: 12 }
+        }));
     }
 
     #[test]

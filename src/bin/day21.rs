@@ -56,6 +56,10 @@ impl GameState {
         }
     }
 
+    pub fn min_score(&self) -> u32 {
+        min(self.scores[0], self.scores[1])
+    }
+
     pub fn max_score(&self) -> u32 {
         max(self.scores[0], self.scores[1])
     }
@@ -76,7 +80,7 @@ fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
         game_state = game_state.advance(roll_total);
     }
 
-    min(game_state.scores[0], game_state.scores[1]) * die
+    game_state.min_score() * die
 }
 
 fn play_quantum_game(p1_position: u32, p2_position: u32) -> u64 {

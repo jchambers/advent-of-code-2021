@@ -64,6 +64,10 @@ impl Cuboid {
     }
 
     pub fn subtract(&self, other: &Cuboid) -> Vec<Cuboid> {
+        if !self.intersects(other) {
+            return vec![self.clone()];
+        }
+
         // Generally speaking, we can represent the difference between two cuboids with at most six
         // new cuboids. If we imagine taking a "core" out of the middle of a cuboid, we can
         // represent the difference as a "roof," a "ceiling," and four walls (left, right, front,
@@ -159,7 +163,17 @@ impl Cuboid {
     }
 
     pub fn union(&self, other: &Cuboid) -> Vec<Cuboid> {
-        todo!()
+        if let Some(intersection) = self.intersection(other) {
+            // To avoid double-counting, subtract the overlapping bit from both cuboids, then add
+            // it on its own.
+            let mut union = self.subtract(&intersection);
+            union.extend(other.subtract(&intersection));
+            union.push(intersection);
+
+            union
+        } else {
+            vec![self.clone(), other.clone()]
+        }
     }
 }
 
@@ -382,6 +396,15 @@ mod test {
 
         assert_eq!(27, original.volume());
 
+        assert_eq!(
+            vec![original.clone()],
+            original.subtract(&Cuboid {
+                x: CoordinateRange { start: 2, end: 2 },
+                y: CoordinateRange { start: 2, end: 2 },
+                z: CoordinateRange { start: 2, end: 2 },
+            })
+        );
+
         {
             let center_cut = Cuboid {
                 x: CoordinateRange { start: 0, end: 0 },
@@ -417,5 +440,48 @@ mod test {
         }
 
         assert!(original.subtract(&original).is_empty());
+    }
+
+    #[test]
+    fn test_union() {
+        let original = Cuboid {
+            x: CoordinateRange { start: -1, end: 1 },
+            y: CoordinateRange { start: -1, end: 1 },
+            z: CoordinateRange { start: -1, end: 1 },
+        };
+
+        {
+            let intersecting = Cuboid {
+                x: CoordinateRange { start: 0, end: 2 },
+                y: CoordinateRange { start: 0, end: 2 },
+                z: CoordinateRange { start: 0, end: 2 },
+            };
+
+            assert_eq!(
+                46,
+                original
+                    .union(&intersecting)
+                    .iter()
+                    .map(Cuboid::volume)
+                    .sum::<u64>()
+            );
+        }
+
+        {
+            let non_intersecting = Cuboid {
+                x: CoordinateRange { start: 0, end: 2 },
+                y: CoordinateRange { start: 0, end: 2 },
+                z: CoordinateRange { start: 0, end: 2 },
+            };
+
+            assert_eq!(
+                54,
+                original
+                    .union(&non_intersecting)
+                    .iter()
+                    .map(Cuboid::volume)
+                    .sum::<u64>()
+            );
+        }
     }
 }

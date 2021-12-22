@@ -168,22 +168,22 @@ impl Cuboid {
         difference
     }
 
-    pub fn union(&self, other: &Cuboid) -> Vec<Cuboid> {
-        if self.contains(other) {
-            vec![*self]
-        } else if other.contains(self) {
-            vec![*other]
-        } else if let Some(intersection) = self.intersection(other) {
-            // To avoid double-counting, subtract the overlapping bit from both cuboids, then add
-            // it on its own.
-            let mut union = self.subtract(&intersection);
-            union.extend(other.subtract(&intersection));
-            union.push(intersection);
+    pub fn union(&self, others: &[Cuboid]) -> Vec<Cuboid> {
+        let mut union = Vec::new();
 
-            union
-        } else {
-            vec![*self, *other]
+        for other in others {
+            if let Some(intersection) = self.intersection(other) {
+                // To avoid double-counting, subtract the overlapping bit from both cuboids, then add
+                // it on its own.
+                union.extend(other.subtract(&intersection));
+            } else {
+                union.push(*other);
+            }
         }
+
+        union.push(*self);
+
+        union
     }
 }
 
@@ -480,57 +480,62 @@ mod test {
             z: CoordinateRange { start: -1, end: 1 },
         };
 
-        {
-            let intersecting = Cuboid {
-                x: CoordinateRange { start: 0, end: 2 },
-                y: CoordinateRange { start: 0, end: 2 },
-                z: CoordinateRange { start: 0, end: 2 },
-            };
+        let intersecting = Cuboid {
+            x: CoordinateRange { start: 0, end: 2 },
+            y: CoordinateRange { start: 0, end: 2 },
+            z: CoordinateRange { start: 0, end: 2 },
+        };
 
-            assert_eq!(
-                46,
-                original
-                    .union(&intersecting)
-                    .iter()
-                    .map(Cuboid::volume)
-                    .sum::<u64>()
-            );
+        assert_eq!(
+            46,
+            original
+                .union(&[intersecting])
+                .iter()
+                .map(Cuboid::volume)
+                .sum::<u64>()
+        );
 
-            assert_eq!(
-                46,
-                intersecting
-                    .union(&original)
-                    .iter()
-                    .map(Cuboid::volume)
-                    .sum::<u64>()
-            );
-        }
+        assert_eq!(
+            46,
+            intersecting
+                .union(&[original])
+                .iter()
+                .map(Cuboid::volume)
+                .sum::<u64>()
+        );
 
-        {
-            let non_intersecting = Cuboid {
-                x: CoordinateRange { start: 3, end: 5 },
-                y: CoordinateRange { start: 3, end: 5 },
-                z: CoordinateRange { start: 3, end: 5 },
-            };
+        let non_intersecting = Cuboid {
+            x: CoordinateRange { start: 3, end: 5 },
+            y: CoordinateRange { start: 3, end: 5 },
+            z: CoordinateRange { start: 3, end: 5 },
+        };
 
-            assert_eq!(
-                54,
-                original
-                    .union(&non_intersecting)
-                    .iter()
-                    .map(Cuboid::volume)
-                    .sum::<u64>()
-            );
+        assert_eq!(
+            54,
+            original
+                .union(&[non_intersecting])
+                .iter()
+                .map(Cuboid::volume)
+                .sum::<u64>()
+        );
 
-            assert_eq!(
-                54,
-                non_intersecting
-                    .union(&original)
-                    .iter()
-                    .map(Cuboid::volume)
-                    .sum::<u64>()
-            );
-        }
+        assert_eq!(
+            54,
+            non_intersecting
+                .union(&[original])
+                .iter()
+                .map(Cuboid::volume)
+                .sum::<u64>()
+        );
+
+        assert_eq!(
+            73,
+            original
+                .union(&[intersecting, non_intersecting])
+                .iter()
+                .map(Cuboid::volume)
+                .sum::<u64>()
+        );
 
         {
             let small = Cuboid {
@@ -542,7 +547,7 @@ mod test {
             assert_eq!(
                 27,
                 original
-                    .union(&small)
+                    .union(&[small])
                     .iter()
                     .map(Cuboid::volume)
                     .sum::<u64>()
@@ -551,7 +556,7 @@ mod test {
             assert_eq!(
                 27,
                 small
-                    .union(&original)
+                    .union(&[original])
                     .iter()
                     .map(Cuboid::volume)
                     .sum::<u64>()

@@ -99,7 +99,9 @@ fn play_quantum_game(p1_position: u32, p2_position: u32) -> u64 {
             let next_state = state.advance(roll);
 
             if next_state.max_score() >= 21 {
-                wins[next_state.active_player ^ 1] += paths_to_state * frequency
+                // This is technically backwards (we're swapping p1/p2 scores), but we only need the
+                // max score, so the order doesn't really matter.
+                wins[next_state.active_player] += paths_to_state * frequency
             } else {
                 state_queue.push_back((next_state, paths_to_state * frequency))
             }

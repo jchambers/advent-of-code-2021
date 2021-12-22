@@ -20,6 +20,65 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
+struct Reactor {
+    bounds: Cuboid,
+    active_cuboids: Vec<Cuboid>,
+}
+
+impl Reactor {
+    pub fn new(bounds: Cuboid) -> Self {
+        Reactor {
+            bounds,
+            active_cuboids: Vec::new(),
+        }
+    }
+
+    pub fn active_cubes(&self) -> u64 {
+        self.active_cuboids.iter()
+            .map(Cuboid::volume)
+            .sum()
+    }
+
+    pub fn apply_instruction(&mut self, instruction: &Instruction) {
+        if !self.bounds.contains(instruction.cuboid()) {
+            return;
+        }
+
+        let intersecting_cuboids = self.take_intersecting_cuboids(instruction.cuboid());
+
+        match instruction {
+            On(cuboid) => {
+                if intersecting_cuboids.is_empty() {
+                    self.active_cuboids.push(*cuboid);
+                } else {
+                    self.active_cuboids.extend(cuboid.union(&intersecting_cuboids))
+                }
+            },
+            Off(cuboid) => {
+                for intersecting_cuboid in intersecting_cuboids {
+                    self.active_cuboids.extend(intersecting_cuboid.subtract(cuboid));
+                }
+            },
+        }
+    }
+
+    fn take_intersecting_cuboids(&mut self, cuboid: &Cuboid) -> Vec<Cuboid> {
+        let mut removed = Vec::new();
+
+        let mut i = 0;
+
+        while i < self.active_cuboids.len() {
+            if self.active_cuboids[i].intersects(cuboid) {
+                removed.push(self.active_cuboids.remove(i));
+            } else {
+                i += 1;
+            }
+        }
+
+        removed
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Cuboid {
     x: CoordinateRange,
@@ -241,6 +300,15 @@ impl FromStr for CoordinateRange {
 enum Instruction {
     On(Cuboid),
     Off(Cuboid),
+}
+
+impl Instruction {
+    pub fn cuboid(&self) -> &Cuboid {
+        match self {
+            On(cuboid) => cuboid,
+            Off(cuboid) => cuboid,
+        }
+    }
 }
 
 impl FromStr for Instruction {
@@ -586,5 +654,48 @@ mod test {
                     .sum::<u64>()
             );
         }
+    }
+
+    #[test]
+    fn test_apply_reactor_instructions() {
+        let mut reactor = Reactor::new(Cuboid {
+            x: CoordinateRange { start: -50, end: 50 },
+            y: CoordinateRange { start: -50, end: 50 },
+            z: CoordinateRange { start: -50, end: 50 },
+        });
+
+        assert_eq!(0, reactor.active_cubes());
+
+        reactor.apply_instruction(&On(Cuboid {
+            x: CoordinateRange { start: 10, end: 12 },
+            y: CoordinateRange { start: 10, end: 12 },
+            z: CoordinateRange { start: 10, end: 12 },
+        }));
+
+        assert_eq!(27, reactor.active_cubes());
+
+        reactor.apply_instruction(&On(Cuboid {
+            x: CoordinateRange { start: 11, end: 13 },
+            y: CoordinateRange { start: 11, end: 13 },
+            z: CoordinateRange { start: 11, end: 13 },
+        }));
+
+        assert_eq!(46, reactor.active_cubes());
+
+        reactor.apply_instruction(&Off(Cuboid {
+            x: CoordinateRange { start: 9, end: 11 },
+            y: CoordinateRange { start: 9, end: 11 },
+            z: CoordinateRange { start: 9, end: 11 },
+        }));
+
+        assert_eq!(38, reactor.active_cubes());
+
+        reactor.apply_instruction(&On(Cuboid {
+            x: CoordinateRange { start: 10, end: 10 },
+            y: CoordinateRange { start: 10, end: 10 },
+            z: CoordinateRange { start: 10, end: 10 },
+        }));
+
+        assert_eq!(39, reactor.active_cubes());
     }
 }

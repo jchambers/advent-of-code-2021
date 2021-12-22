@@ -63,19 +63,22 @@ impl GameState {
 
 fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
     let mut game_state = GameState::new(p1_position, p2_position);
-    let mut die = DeterministicDie::new();
+    let mut die = 0;
+    let mut turns = 0;
 
     while game_state.max_score() < 1_000 {
         let mut roll_total = 0;
 
         for _ in 0..3 {
-            roll_total += die.roll();
+            roll_total += (die + 1) % 100;
+            die += 1;
         }
 
         game_state = game_state.advance(roll_total);
+        turns += 1;
     }
 
-    *game_state.scores.iter().min().unwrap() * die.roll_count()
+    *game_state.scores.iter().min().unwrap() * turns * 3
 }
 
 fn play_quantum_game(p1_position: u32, p2_position: u32) -> u64 {
@@ -104,42 +107,9 @@ fn play_quantum_game(p1_position: u32, p2_position: u32) -> u64 {
     max(wins[0], wins[1])
 }
 
-struct DeterministicDie {
-    roll_count: u32,
-}
-
-impl DeterministicDie {
-    pub fn new() -> Self {
-        DeterministicDie { roll_count: 0 }
-    }
-
-    fn roll(&mut self) -> u32 {
-        let roll = (self.roll_count % 100) + 1;
-        self.roll_count += 1;
-
-        roll
-    }
-
-    fn roll_count(&self) -> u32 {
-        self.roll_count
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn test_deterministic_die() {
-        let mut die = DeterministicDie::new();
-
-        for expected in 1..=100 {
-            assert_eq!(expected, die.roll());
-        }
-
-        assert_eq!(1, die.roll());
-        assert_eq!(101, die.roll_count);
-    }
 
     #[test]
     fn test_play_deterministic_game() {

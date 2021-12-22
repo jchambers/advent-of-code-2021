@@ -63,6 +63,12 @@ impl Cuboid {
         }
     }
 
+    pub fn contains(&self, other: &Cuboid) -> bool {
+        self.x.start <= other.x.start && self.x.end >= other.x.end
+            && self.y.start <= other.y.start && self.y.end >= other.y.end
+            && self.z.start <= other.z.start && self.z.end >= other.z.end
+    }
+
     pub fn subtract(&self, other: &Cuboid) -> Vec<Cuboid> {
         if !self.intersects(other) {
             return vec![*self];
@@ -163,7 +169,11 @@ impl Cuboid {
     }
 
     pub fn union(&self, other: &Cuboid) -> Vec<Cuboid> {
-        if let Some(intersection) = self.intersection(other) {
+        if self.contains(other) {
+            vec![*self]
+        } else if other.contains(self) {
+            vec![*other]
+        } else if let Some(intersection) = self.intersection(other) {
             // To avoid double-counting, subtract the overlapping bit from both cuboids, then add
             // it on its own.
             let mut union = self.subtract(&intersection);
@@ -387,6 +397,26 @@ mod test {
     }
 
     #[test]
+    fn test_contains() {
+        let large = Cuboid {
+            x: CoordinateRange { start: -1, end: 1 },
+            y: CoordinateRange { start: -1, end: 1 },
+            z: CoordinateRange { start: -1, end: 1 },
+        };
+
+        let small = Cuboid {
+            x: CoordinateRange { start: 0, end: 0 },
+            y: CoordinateRange { start: 0, end: 0 },
+            z: CoordinateRange { start: 0, end: 0 },
+        };
+
+        assert!(large.contains(&small));
+        assert!(large.contains(&large));
+        assert!(small.contains(&small));
+        assert!(!small.contains(&large));
+    }
+
+    #[test]
     fn test_subtract() {
         let original = Cuboid {
             x: CoordinateRange { start: -1, end: 1 },
@@ -465,19 +495,63 @@ mod test {
                     .map(Cuboid::volume)
                     .sum::<u64>()
             );
+
+            assert_eq!(
+                46,
+                intersecting
+                    .union(&original)
+                    .iter()
+                    .map(Cuboid::volume)
+                    .sum::<u64>()
+            );
         }
 
         {
             let non_intersecting = Cuboid {
-                x: CoordinateRange { start: 0, end: 2 },
-                y: CoordinateRange { start: 0, end: 2 },
-                z: CoordinateRange { start: 0, end: 2 },
+                x: CoordinateRange { start: 3, end: 5 },
+                y: CoordinateRange { start: 3, end: 5 },
+                z: CoordinateRange { start: 3, end: 5 },
             };
 
             assert_eq!(
                 54,
                 original
                     .union(&non_intersecting)
+                    .iter()
+                    .map(Cuboid::volume)
+                    .sum::<u64>()
+            );
+
+            assert_eq!(
+                54,
+                non_intersecting
+                    .union(&original)
+                    .iter()
+                    .map(Cuboid::volume)
+                    .sum::<u64>()
+            );
+        }
+
+        {
+            let small = Cuboid {
+                x: CoordinateRange { start: 0, end: 0 },
+                y: CoordinateRange { start: 0, end: 0 },
+                z: CoordinateRange { start: 0, end: 0 },
+            };
+
+            assert_eq!(
+                27,
+                original
+                    .union(&small)
+                    .iter()
+                    .map(Cuboid::volume)
+                    .sum::<u64>()
+            );
+
+            assert_eq!(
+                27,
+                small
+                    .union(&original)
                     .iter()
                     .map(Cuboid::volume)
                     .sum::<u64>()

@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Cuboid {
     x: CoordinateRange,
     y: CoordinateRange,
@@ -37,7 +37,30 @@ impl Cuboid {
     }
 
     fn intersection(&self, other: &Cuboid) -> Option<Cuboid> {
-        todo!()
+        if self.x.start <= other.x.end
+            && self.x.end >= other.x.start
+            && self.x.start <= other.x.end
+            && self.x.end >= other.x.start
+            && self.x.start <= other.x.end
+            && self.x.end >= other.x.start
+        {
+            Some(Cuboid {
+                x: CoordinateRange {
+                    start: max(self.x.start, other.x.start),
+                    end: min(self.x.end, other.x.end),
+                },
+                y: CoordinateRange {
+                    start: max(self.y.start, other.y.start),
+                    end: min(self.y.end, other.y.end),
+                },
+                z: CoordinateRange {
+                    start: max(self.z.start, other.z.start),
+                    end: min(self.z.end, other.z.end),
+                },
+            })
+        } else {
+            None
+        }
     }
 
     pub fn subtract(&self, other: &Cuboid) -> Vec<Cuboid> {
@@ -217,6 +240,49 @@ impl FromStr for Instruction {
 mod test {
     use super::*;
 
+    const CORNER_CUTS: [Cuboid; 8] = [
+        Cuboid {
+            x: CoordinateRange { start: 0, end: 1 },
+            y: CoordinateRange { start: 0, end: 1 },
+            z: CoordinateRange { start: 0, end: 1 },
+        },
+        Cuboid {
+            x: CoordinateRange { start: 0, end: 1 },
+            y: CoordinateRange { start: 0, end: 1 },
+            z: CoordinateRange { start: -1, end: 0 },
+        },
+        Cuboid {
+            x: CoordinateRange { start: 0, end: 1 },
+            y: CoordinateRange { start: -1, end: 0 },
+            z: CoordinateRange { start: 0, end: 1 },
+        },
+        Cuboid {
+            x: CoordinateRange { start: -1, end: 0 },
+            y: CoordinateRange { start: 0, end: 1 },
+            z: CoordinateRange { start: 0, end: 1 },
+        },
+        Cuboid {
+            x: CoordinateRange { start: 0, end: 1 },
+            y: CoordinateRange { start: -1, end: 0 },
+            z: CoordinateRange { start: -1, end: 0 },
+        },
+        Cuboid {
+            x: CoordinateRange { start: -1, end: 0 },
+            y: CoordinateRange { start: 0, end: 1 },
+            z: CoordinateRange { start: -1, end: 0 },
+        },
+        Cuboid {
+            x: CoordinateRange { start: -1, end: 0 },
+            y: CoordinateRange { start: -1, end: 0 },
+            z: CoordinateRange { start: 0, end: 1 },
+        },
+        Cuboid {
+            x: CoordinateRange { start: -1, end: 0 },
+            y: CoordinateRange { start: -1, end: 0 },
+            z: CoordinateRange { start: -1, end: 0 },
+        },
+    ];
+
     #[test]
     fn test_range_from_string() {
         assert_eq!(
@@ -286,6 +352,27 @@ mod test {
     }
 
     #[test]
+    fn test_intersection() {
+        let original = Cuboid {
+            x: CoordinateRange { start: -1, end: 1 },
+            y: CoordinateRange { start: -1, end: 1 },
+            z: CoordinateRange { start: -1, end: 1 },
+        };
+
+        for corner_cut in CORNER_CUTS {
+            assert_eq!(Some(corner_cut.clone()), original.intersection(&corner_cut));
+        }
+
+        assert!(original
+            .intersection(&Cuboid {
+                x: CoordinateRange { start: 2, end: 2 },
+                y: CoordinateRange { start: 2, end: 2 },
+                z: CoordinateRange { start: 2, end: 2 },
+            })
+            .is_none());
+    }
+
+    #[test]
     fn test_subtract() {
         let original = Cuboid {
             x: CoordinateRange { start: -1, end: 1 },
@@ -315,70 +402,18 @@ mod test {
             );
         }
 
-        {
-            let corner_cuts = [
-                Cuboid {
-                    x: CoordinateRange { start: 0, end: 1 },
-                    y: CoordinateRange { start: 0, end: 1 },
-                    z: CoordinateRange { start: 0, end: 1 },
-                },
+        for corner_cut in CORNER_CUTS {
+            assert_eq!(8, corner_cut.volume());
 
-                Cuboid {
-                    x: CoordinateRange { start: 0, end: 1 },
-                    y: CoordinateRange { start: 0, end: 1 },
-                    z: CoordinateRange { start: -1, end: 0 },
-                },
-
-                Cuboid {
-                    x: CoordinateRange { start: 0, end: 1 },
-                    y: CoordinateRange { start: -1, end: 0 },
-                    z: CoordinateRange { start: 0, end: 1 },
-                },
-
-                Cuboid {
-                    x: CoordinateRange { start: -1, end: 0 },
-                    y: CoordinateRange { start: 0, end: 1 },
-                    z: CoordinateRange { start: 0, end: 1 },
-                },
-
-                Cuboid {
-                    x: CoordinateRange { start: 0, end: 1 },
-                    y: CoordinateRange { start: -1, end: 0 },
-                    z: CoordinateRange { start: -1, end: 0 },
-                },
-
-                Cuboid {
-                    x: CoordinateRange { start: -1, end: 0 },
-                    y: CoordinateRange { start: 0, end: 1 },
-                    z: CoordinateRange { start: -1, end: 0 },
-                },
-
-                Cuboid {
-                    x: CoordinateRange { start: -1, end: 0 },
-                    y: CoordinateRange { start: -1, end: 0 },
-                    z: CoordinateRange { start: 0, end: 1 },
-                },
-
-                Cuboid {
-                    x: CoordinateRange { start: -1, end: 0 },
-                    y: CoordinateRange { start: -1, end: 0 },
-                    z: CoordinateRange { start: -1, end: 0 },
-                },
-            ];
-
-            for corner_cut in corner_cuts {
-                assert_eq!(8, corner_cut.volume());
-
-                assert_eq!(3, original.subtract(&corner_cut).len());
-                assert_eq!(
-                    original.volume() - corner_cut.volume(),
-                    original
-                        .subtract(&corner_cut)
-                        .iter()
-                        .map(Cuboid::volume)
-                        .sum::<u64>()
-                );
-            }
+            assert_eq!(3, original.subtract(&corner_cut).len());
+            assert_eq!(
+                original.volume() - corner_cut.volume(),
+                original
+                    .subtract(&corner_cut)
+                    .iter()
+                    .map(Cuboid::volume)
+                    .sum::<u64>()
+            );
         }
 
         assert!(original.subtract(&original).is_empty());

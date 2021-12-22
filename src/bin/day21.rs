@@ -64,7 +64,6 @@ impl GameState {
 fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
     let mut game_state = GameState::new(p1_position, p2_position);
     let mut die = 0;
-    let mut turns = 0;
 
     while game_state.max_score() < 1_000 {
         let mut roll_total = 0;
@@ -75,10 +74,9 @@ fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
         }
 
         game_state = game_state.advance(roll_total);
-        turns += 1;
     }
 
-    *game_state.scores.iter().min().unwrap() * turns * 3
+    *game_state.scores.iter().min().unwrap() * die
 }
 
 fn play_quantum_game(p1_position: u32, p2_position: u32) -> u64 {

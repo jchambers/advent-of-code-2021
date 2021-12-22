@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::{env, error};
@@ -76,7 +76,7 @@ fn play_deterministic_game(p1_position: u32, p2_position: u32) -> u32 {
         game_state = game_state.advance(roll_total);
     }
 
-    *game_state.scores.iter().min().unwrap() * die
+    min(game_state.scores[0], game_state.scores[1]) * die
 }
 
 fn play_quantum_game(p1_position: u32, p2_position: u32) -> u64 {

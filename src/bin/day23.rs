@@ -9,17 +9,24 @@ use std::{env, error};
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
-    if let Some(path) = args.get(1) {
-        let burrow = Burrow::<2>::from_str(std::fs::read_to_string(path)?.as_str())?;
+    if args.len() == 3 {
+        let burrow_folded = Burrow::<2>::from_str(std::fs::read_to_string(args[1].as_str())?.as_str())?;
 
         println!(
-            "Min cost to settle positions: {}",
-            burrow.min_cost_to_resolve().unwrap()
+            "Min cost to settle positions (folded map): {}",
+            burrow_folded.min_cost_to_resolve().unwrap()
+        );
+
+        let burrow_unfolded = Burrow::<4>::from_str(std::fs::read_to_string(args[2].as_str())?.as_str())?;
+
+        println!(
+            "Min cost to settle positions (unfolded map): {}",
+            burrow_unfolded.min_cost_to_resolve().unwrap()
         );
 
         Ok(())
     } else {
-        Err("Usage: day23 INPUT_FILE_PATH".into())
+        Err("Usage: day23 INPUT_FILE_1_PATH INPUT_FILE_2_PATH".into())
     }
 }
 

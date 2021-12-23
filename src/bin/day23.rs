@@ -24,7 +24,6 @@ enum Amphipod {
 }
 
 impl Amphipod {
-    #[inline]
     fn cost_to_move(&self, distance: u32) -> u32 {
         distance as u32
             * match self {
@@ -82,7 +81,6 @@ impl Position {
         }
     }
 
-    #[inline]
     pub fn room_position_in_hallway(amphipod: Amphipod) -> u32 {
         match amphipod {
             A => 2,
@@ -92,7 +90,6 @@ impl Position {
         }
     }
 
-    #[inline]
     fn abs_diff(a: u32, b: u32) -> u32 {
         if a > b {
             a - b
@@ -102,7 +99,7 @@ impl Position {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct Burrow {
     // Each amphipod has a permanent slot in this array. The first two are A1 and A2, the next are
     // B1 and B2, and so on.
@@ -144,12 +141,16 @@ impl Burrow {
 
                 positions[index] = position;
 
-                amphipods_placed.entry(initial_positions[i]).and_modify(|placed| *placed += 1);
+                amphipods_placed
+                    .entry(initial_positions[i])
+                    .and_modify(|placed| *placed += 1);
                 i += 1;
             }
         }
 
-        assert!(positions.iter().all(|position| matches!(position, Room(_, _))));
+        assert!(positions
+            .iter()
+            .all(|position| matches!(position, Room(_, _))));
 
         Self { positions }
     }
@@ -159,7 +160,9 @@ impl Burrow {
         // assume that any amphipod can move immediately/directly to its destination. As a bit of a
         // hack, assume both amphipods are heading for the deepest part of the room, then "refund"
         // one such move.
-        let cost: u32 = self.positions.iter()
+        let cost: u32 = self
+            .positions
+            .iter()
             .enumerate()
             .map(|(i, position)| {
                 let amphipod = Self::amphipod_at_position_index(i);
@@ -174,7 +177,6 @@ impl Burrow {
         cost - 1111
     }
 
-    #[inline]
     fn amphipod_at_position_index(index: usize) -> Amphipod {
         match index {
             0 | 1 => A,
@@ -184,32 +186,89 @@ impl Burrow {
         }
     }
 
-    fn next_possible_states(&self) -> Vec<(Burrow, u32)> {
+    fn next_possible_states(&self) -> Vec<(Self, u32)> {
+        const LEGAL_HALLWAY_STOPS: [u32; 7] = [0, 1, 3, 5, 7, 9, 10];
+
         let mut next_possible_states = Vec::new();
 
-        for position in self.positions {
+        self.positions.iter().enumerate().for_each(|(i, position)| {
+            let amphipod = Self::amphipod_at_position_index(i);
+
             match position {
-                Hallway(_) => {
-                    // If we're in the hallway, the only legal move is into our target room if it's
-                    // empty or if it has one occupant of the correct type.
-                },
-                Room(_, _) => {
+                &Hallway(h) => {
+                    // If we're in the hallway, the only legal move is into our target room if
+                    // it's empty or if it has one occupant of the correct type.
+                    let destination_room = Position::room_position_in_hallway(amphipod);
+
+                    if self.hallway_path_clear(h, destination_room) {
+                        if let Some(space) = self.destination_space_within_room(amphipod) {
+                            next_possible_states.push(self.with_move(i, Room(amphipod, space)));
+                        }
+                    }
+                }
+                &Room(room, space) => {
                     // If we're in a room, there are a few possibilities:
                     //
-                    // 1. We're in the right room, but are blocking somebody who needs to get out,
-                    // and we should move
-                    // 2. We're in the right room and are either in the back of the room or at the
-                    // front of the room with a roommate of the correct type, and we shouldn't move
-                    // 3. We're in the wrong room and should move either directly into our target
-                    // room if possible or, if not, into the hallway
-                },
+                    // 1. We're in the right room, but are blocking somebody who needs to get
+                    // out, and we should move
+                    // 2. We're in the right room and are either in the back of the room or at
+                    // the front of the room with a roommate of the correct type, and we
+                    // shouldn't move
+                    // 3. We're in the wrong room and should move
+                    let should_move = if amphipod == room {
+                        // We're in the right room, but are we blocking somebody who wants to
+                        // get out?
+                        if space == 0 {
+                            // We're at the front of the room, so somebody MUST be at the back
+                            // of the room
+                            self.room_occupants(room)[1].unwrap() != room
+                        } else {
+                            // We're at the back of the room and should never move
+                            false
+                        }
+                    } else {
+                        // We're in the wrong room and should definitely move
+                        true
+                    };
+
+                    if should_move {
+                        // We know we SHOULD move, but can we?
+                        if self.path_to_hallway_clear(room, space) {
+                            // If we can make it into our target room, do it and consider no
+                            // other possible moves
+                            let destination_space = self.destination_space_within_room(amphipod);
+                            let start_room_position = Position::room_position_in_hallway(room);
+                            let dest_room_position = Position::room_position_in_hallway(amphipod);
+
+                            if destination_space.is_some()
+                                && self.hallway_path_clear(start_room_position, dest_room_position)
+                            {
+                                next_possible_states.push(
+                                    self.with_move(i, Room(amphipod, destination_space.unwrap())),
+                                );
+                            } else {
+                                // Looks like we're moving to the hallway instead
+                                for dest_hallway_position in LEGAL_HALLWAY_STOPS {
+                                    if self.hallway_path_clear(
+                                        start_room_position,
+                                        dest_hallway_position,
+                                    ) {
+                                        next_possible_states.push(
+                                            self.with_move(i, Hallway(dest_hallway_position)),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        }
+        });
 
         next_possible_states
     }
 
-    fn hallway_path_clear(&self, start: usize, destination: usize) -> bool {
+    fn hallway_path_clear(&self, start: u32, destination: u32) -> bool {
         let mut hallway = [true; 11];
 
         for position in self.positions {
@@ -219,12 +278,23 @@ impl Burrow {
         }
 
         let hallway_slice = if start < destination {
-            &hallway[start + 1..=destination]
+            &hallway[(start + 1) as usize..=destination as usize]
         } else {
-            &hallway[destination..start]
+            &hallway[destination as usize..start as usize]
         };
 
         hallway_slice.iter().all(|&space| space)
+    }
+
+    fn path_to_hallway_clear(&self, room: Amphipod, space: u32) -> bool {
+        if space == 0 {
+            true
+        } else {
+            // We're in the back of the room; is anybody in the front?
+            let front_of_room = Room(room, 0);
+
+            !self.positions.iter().any(|&p| p == front_of_room)
+        }
     }
 
     fn room_occupants(&self, room: Amphipod) -> [Option<Amphipod>; 2] {
@@ -251,6 +321,17 @@ impl Burrow {
         } else {
             None
         }
+    }
+
+    fn with_move(&self, amphipod_index: usize, destination: Position) -> (Self, u32) {
+        let mut positions = self.positions.clone();
+
+        let amphipod = Self::amphipod_at_position_index(amphipod_index);
+        let cost = amphipod.cost_to_move(positions[amphipod_index].distance_to(&destination));
+
+        positions[amphipod_index] = destination;
+
+        (Burrow { positions }, cost)
     }
 }
 
@@ -348,5 +429,40 @@ mod test {
         burrow.positions[2] = Hallway(10);
 
         assert!(burrow.destination_space_within_room(B).is_none());
+    }
+
+    #[test]
+    fn test_path_to_hallway_clear() {
+        let mut burrow = Burrow::new([D, A, B, C, C, B, A, D]);
+
+        assert!(burrow.path_to_hallway_clear(A, 0));
+        assert!(!burrow.path_to_hallway_clear(A, 1));
+
+        // Move D from the A room into the hallway
+        burrow.positions[6] = Hallway(0);
+
+        assert!(burrow.path_to_hallway_clear(A, 1));
+    }
+
+    #[test]
+    fn test_with_move() {
+        let burrow = Burrow::new([D, A, B, C, C, B, A, D]);
+
+        let expected_burrow = Burrow {
+            positions: [
+                Room(A, 1),
+                Room(D, 0),
+                Room(B, 0),
+                Room(C, 1),
+                Room(B, 1),
+                Room(C, 0),
+                Hallway(0),
+                Room(D, 1),
+            ],
+        };
+
+        let expected_cost = 3000;
+
+        assert_eq!((expected_burrow, expected_cost), burrow.with_move(6, Hallway(0)));
     }
 }

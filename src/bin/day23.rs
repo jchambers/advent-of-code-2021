@@ -1,7 +1,8 @@
 use self::Amphipod::*;
 use self::Position::*;
-use std::collections::HashMap;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::{env, error};
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
@@ -47,7 +48,7 @@ impl ToString for Amphipod {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum Position {
     // Hallway spaces are numbered left to right; the entrance to the first room is at 2, the second
     // is at 4, etc.
@@ -111,7 +112,7 @@ impl Position {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 struct Burrow {
     // Each amphipod has a permanent slot in this array. The first two are A1 and A2, the next are
     // B1 and B2, and so on.
@@ -167,7 +168,43 @@ impl Burrow {
         Self { positions }
     }
 
-    fn min_cost_to_resolve(&self) -> u32 {
+    pub fn min_cost_to_resolve(&self) -> u32 {
+        let mut visited_states = HashSet::new();
+        let mut tentative_costs = BinaryHeap::new();
+
+        tentative_costs.push(StateAndCost {
+            cost: 0,
+            state: *self,
+            heuristic_cost: self.min_cost_heuristic()
+        });
+
+        while let Some(state_and_cost) = tentative_costs.pop() {
+            if visited_states.contains(&(state_and_cost.state)) {
+                continue;
+            }
+
+            if state_and_cost.state.is_settled() {
+                return state_and_cost.cost;
+            }
+
+            state_and_cost.state.next_possible_states()
+                .iter()
+                .filter(|(next_state, _)| !visited_states.contains(next_state))
+                .for_each(|&(next_state, cost)| {
+                    tentative_costs.push(StateAndCost {
+                        state: next_state,
+                        cost: cost + state_and_cost.cost,
+                        heuristic_cost: cost + state_and_cost.cost + state_and_cost.state.min_cost_heuristic(),
+                    })
+                });
+
+            visited_states.insert(state_and_cost.state);
+        }
+
+        todo!()
+    }
+
+    fn min_cost_heuristic(&self) -> u32 {
         // To calculate the minimum cost to get "home" for any amphipod, ignore collisions and just
         // assume that any amphipod can move immediately/directly to its destination. As a bit of a
         // hack, assume both amphipods are heading for the deepest part of the room, then "refund"
@@ -349,7 +386,7 @@ impl Burrow {
     fn amphipod_at_position(&self, position: Position) -> Option<Amphipod> {
         self.positions.iter()
             .enumerate()
-            .find(|(i, &p)| p == position)
+            .find(|(_, &p)| p == position)
             .map(|(i, _)| Self::amphipod_at_position_index(i))
     }
 
@@ -403,6 +440,26 @@ impl Display for Burrow {
     }
 }
 
+#[derive(Eq, PartialEq)]
+struct StateAndCost {
+    state: Burrow,
+    cost: u32,
+    heuristic_cost: u32,
+}
+
+impl Ord for StateAndCost {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Swap the "normal" order so we have a min-first heap
+        other.heuristic_cost.cmp(&self.heuristic_cost)
+    }
+}
+
+impl PartialOrd for StateAndCost {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -427,10 +484,10 @@ mod test {
     }
 
     #[test]
-    fn test_min_cost_to_resolve() {
+    fn test_min_cost_heuristic() {
         assert_eq!(
             0,
-            Burrow::new([A, A, B, B, C, C, D, D]).min_cost_to_resolve()
+            Burrow::new([A, A, B, B, C, C, D, D]).min_cost_heuristic()
         );
 
         // #############
@@ -443,7 +500,7 @@ mod test {
         // total of 8. A moves 1 out, 6 over, and 1 into the room (also 8).
         assert_eq!(
             8008,
-            Burrow::new([D, A, B, B, C, C, A, D]).min_cost_to_resolve()
+            Burrow::new([D, A, B, B, C, C, A, D]).min_cost_heuristic()
         );
     }
 
@@ -535,8 +592,19 @@ mod test {
     }
 
     #[test]
+    fn test_next_possible_states() {
+        assert!(Burrow::new([A, A, B, B, C, C, D, D]).next_possible_states().is_empty());
+        assert!(!Burrow::new([D, A, B, C, C, B, A, D]).next_possible_states().is_empty());
+    }
+
+    #[test]
     fn test_is_settled() {
         assert!(Burrow::new([A, A, B, B, C, C, D, D]).is_settled());
         assert!(!Burrow::new([D, A, B, C, C, B, A, D]).is_settled());
+    }
+
+    #[test]
+    fn test_min_cost_to_resolve() {
+        assert_eq!(12521, Burrow::new([B, A, C, D, B, C, D, A]).min_cost_to_resolve());
     }
 }

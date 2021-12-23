@@ -9,14 +9,16 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() == 3 {
-        let burrow_folded = Burrow::<2>::from_str(std::fs::read_to_string(args[1].as_str())?.as_str())?;
+        let burrow_folded =
+            Burrow::<2>::from_str(std::fs::read_to_string(args[1].as_str())?.as_str())?;
 
         println!(
             "Min cost to settle positions (folded map): {}",
             burrow_folded.min_cost_to_resolve().unwrap()
         );
 
-        let burrow_unfolded = Burrow::<4>::from_str(std::fs::read_to_string(args[2].as_str())?.as_str())?;
+        let burrow_unfolded =
+            Burrow::<4>::from_str(std::fs::read_to_string(args[2].as_str())?.as_str())?;
 
         println!(
             "Min cost to settle positions (unfolded map): {}",
@@ -169,7 +171,7 @@ impl<const N: usize> Burrow<N> {
             for space in 0..initial_positions[room].len() {
                 positions_by_amphipod_type
                     .entry(initial_positions[room][space])
-                    .or_insert(Vec::new())
+                    .or_insert_with(Vec::new)
                     .push(Room(room_type, space as u32))
             }
         }
@@ -275,12 +277,13 @@ impl<const N: usize> Burrow<N> {
                         // get out?
                         let occupants = self.room_occupants(room);
 
-                        occupants[space as usize..].iter()
-                            .any(|&maybe_occupant| if let Some(occupant) = maybe_occupant {
+                        occupants[space as usize..].iter().any(|&maybe_occupant| {
+                            if let Some(occupant) = maybe_occupant {
                                 occupant != room
                             } else {
                                 false
-                            })
+                            }
+                        })
                     } else {
                         // We're in the wrong room and should definitely move
                         true
@@ -295,13 +298,12 @@ impl<const N: usize> Burrow<N> {
                             let start_room_position = Position::room_position_in_hallway(room);
                             let dest_room_position = Position::room_position_in_hallway(amphipod);
 
-                            if destination_space.is_some()
-                                && self.hallway_path_clear(start_room_position, dest_room_position)
-                            {
-                                next_possible_states.push(self.with_move(
-                                    position,
-                                    Room(amphipod, destination_space.unwrap()),
-                                ));
+                            if let Some(s) = destination_space {
+                                if self.hallway_path_clear(start_room_position, dest_room_position)
+                                {
+                                    next_possible_states
+                                        .push(self.with_move(position, Room(amphipod, s)));
+                                }
                             } else {
                                 // Looks like we're moving to the hallway instead
                                 for dest_hallway_position in LEGAL_HALLWAY_STOPS {
@@ -607,7 +609,8 @@ mod test {
 
         assert_eq!(
             Some(44169),
-            Burrow::new([[B, D, D, A], [C, C, B, D], [B, B, A, C], [D, A, C, A]]).min_cost_to_resolve()
+            Burrow::new([[B, D, D, A], [C, C, B, D], [B, B, A, C], [D, A, C, A]])
+                .min_cost_to_resolve()
         );
     }
 

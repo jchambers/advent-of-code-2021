@@ -352,6 +352,17 @@ impl Burrow {
             .find(|(i, &p)| p == position)
             .map(|(i, _)| Self::amphipod_at_position_index(i))
     }
+
+    fn is_settled(&self) -> bool {
+        matches!(self.positions[0], Room(A, _))
+            && matches!(self.positions[1], Room(A, _))
+            && matches!(self.positions[2], Room(B, _))
+            && matches!(self.positions[3], Room(B, _))
+            && matches!(self.positions[4], Room(C, _))
+            && matches!(self.positions[5], Room(C, _))
+            && matches!(self.positions[6], Room(D, _))
+            && matches!(self.positions[7], Room(D, _))
+    }
 }
 
 impl Display for Burrow {
@@ -521,5 +532,11 @@ mod test {
         let expected_cost = 3000;
 
         assert_eq!((expected_burrow, expected_cost), burrow.with_move(6, Hallway(0)));
+    }
+
+    #[test]
+    fn test_is_settled() {
+        assert!(Burrow::new([A, A, B, B, C, C, D, D]).is_settled());
+        assert!(!Burrow::new([D, A, B, C, C, B, A, D]).is_settled());
     }
 }

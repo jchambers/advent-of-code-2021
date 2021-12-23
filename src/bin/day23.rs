@@ -83,7 +83,7 @@ impl Position {
     }
 
     #[inline]
-    fn room_position_in_hallway(amphipod: Amphipod) -> u32 {
+    pub fn room_position_in_hallway(amphipod: Amphipod) -> u32 {
         match amphipod {
             A => 2,
             B => 4,
@@ -183,6 +183,75 @@ impl Burrow {
             _ => D,
         }
     }
+
+    fn next_possible_states(&self) -> Vec<(Burrow, u32)> {
+        let mut next_possible_states = Vec::new();
+
+        for position in self.positions {
+            match position {
+                Hallway(_) => {
+                    // If we're in the hallway, the only legal move is into our target room if it's
+                    // empty or if it has one occupant of the correct type.
+                },
+                Room(_, _) => {
+                    // If we're in a room, there are a few possibilities:
+                    //
+                    // 1. We're in the right room, but are blocking somebody who needs to get out,
+                    // and we should move
+                    // 2. We're in the right room and are either in the back of the room or at the
+                    // front of the room with a roommate of the correct type, and we shouldn't move
+                    // 3. We're in the wrong room and should move either directly into our target
+                    // room if possible or, if not, into the hallway
+                },
+            }
+        }
+
+        next_possible_states
+    }
+
+    fn hallway_path_clear(&self, start: usize, destination: usize) -> bool {
+        let mut hallway = [true; 11];
+
+        for position in self.positions {
+            if let Hallway(h) = position {
+                hallway[h as usize] = false;
+            }
+        }
+
+        let hallway_slice = if start < destination {
+            &hallway[start + 1..=destination]
+        } else {
+            &hallway[destination..start]
+        };
+
+        hallway_slice.iter().all(|&space| space)
+    }
+
+    fn room_occupants(&self, room: Amphipod) -> [Option<Amphipod>; 2] {
+        let mut occupants = [None; 2];
+
+        for i in 0..self.positions.len() {
+            if let Room(r, space) = self.positions[i] {
+                if r == room {
+                    occupants[space as usize] = Some(Self::amphipod_at_position_index(i));
+                }
+            }
+        }
+
+        occupants
+    }
+
+    fn destination_space_within_room(&self, amphipod: Amphipod) -> Option<u32> {
+        let occupants = self.room_occupants(amphipod);
+
+        if occupants == [None, None] {
+            Some(1)
+        } else if occupants == [None, Some(amphipod)] {
+            Some(0)
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -227,5 +296,57 @@ mod test {
             8008,
             Burrow::new([D, A, B, B, C, C, A, D]).min_cost_to_resolve()
         );
+    }
+
+    #[test]
+    fn test_room_occupants() {
+        let mut burrow = Burrow::new([D, A, B, B, C, C, A, D]);
+
+        assert_eq!([Some(D), Some(A)], burrow.room_occupants(A));
+
+        burrow.positions[6] = Hallway(0);
+        assert_eq!([None, Some(A)], burrow.room_occupants(A));
+
+        burrow.positions[0] = Hallway(1);
+        assert_eq!([None, None], burrow.room_occupants(A));
+    }
+
+    #[test]
+    fn test_hallway_path_clear() {
+        let mut burrow = Burrow::new([D, A, B, B, C, C, A, D]);
+
+        assert!(burrow.hallway_path_clear(0, 10));
+
+        burrow.positions[6] = Hallway(5);
+
+        assert!(!burrow.hallway_path_clear(0, 10));
+        assert!(!burrow.hallway_path_clear(10, 0));
+        assert!(burrow.hallway_path_clear(0, 4));
+        assert!(!burrow.hallway_path_clear(0, 5));
+        assert!(burrow.hallway_path_clear(5, 0));
+        assert!(burrow.hallway_path_clear(5, 10));
+        assert!(!burrow.hallway_path_clear(10, 5));
+    }
+
+    #[test]
+    fn test_destination_space_within_room() {
+        let mut burrow = Burrow::new([D, A, B, C, C, B, A, D]);
+
+        assert!(burrow.destination_space_within_room(A).is_none());
+
+        // Move D from the A room into the hallway
+        burrow.positions[6] = Hallway(0);
+
+        assert_eq!(0, burrow.destination_space_within_room(A).unwrap());
+
+        // Move A from the A room into the hallway
+        burrow.positions[0] = Hallway(1);
+
+        assert_eq!(1, burrow.destination_space_within_room(A).unwrap());
+
+        // Move B from the B room into the hallway, leaving C in place
+        burrow.positions[2] = Hallway(10);
+
+        assert!(burrow.destination_space_within_room(B).is_none());
     }
 }

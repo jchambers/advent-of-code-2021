@@ -2,6 +2,7 @@ use self::Amphipod::*;
 use self::Position::*;
 use std::collections::HashMap;
 use std::{env, error};
+use std::fmt::{Display, Formatter};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -32,6 +33,17 @@ impl Amphipod {
                 C => 100,
                 D => 1000,
             }
+    }
+}
+
+impl ToString for Amphipod {
+    fn to_string(&self) -> String {
+        match self {
+            A => String::from("A"),
+            B => String::from("B"),
+            C => String::from("C"),
+            D => String::from("D"),
+        }
     }
 }
 
@@ -332,6 +344,51 @@ impl Burrow {
         positions[amphipod_index] = destination;
 
         (Burrow { positions }, cost)
+    }
+
+    fn amphipod_at_position(&self, position: Position) -> Option<Amphipod> {
+        self.positions.iter()
+            .enumerate()
+            .find(|(i, &p)| p == position)
+            .map(|(i, _)| Self::amphipod_at_position_index(i))
+    }
+}
+
+impl Display for Burrow {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "█████████████")?;
+        write!(f, "█")?;
+
+        for h in 0..11 {
+            write!(f, "{}", self.amphipod_at_position(Hallway(h))
+                .map(|amphipod| amphipod.to_string())
+                .unwrap_or(String::from(" ")))?;
+        }
+
+        writeln!(f, "█")?;
+        write!(f, "██")?;
+
+        for room in [A, B, C, D] {
+            write!(f, "█")?;
+            write!(f, "{}", self.amphipod_at_position(Room(room, 0))
+                .map(|amphipod| amphipod.to_string())
+                .unwrap_or(String::from(" ")))?;
+        }
+
+        writeln!(f, "███")?;
+        write!(f, "  ")?;
+
+        for room in [A, B, C, D] {
+            write!(f, "█")?;
+            write!(f, "{}", self.amphipod_at_position(Room(room, 1))
+                .map(|amphipod| amphipod.to_string())
+                .unwrap_or(String::from(" ")))?;
+        }
+
+        writeln!(f, "█")?;
+        writeln!(f, "  █████████")?;
+
+        Ok(())
     }
 }
 

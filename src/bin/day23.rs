@@ -2,7 +2,6 @@ use self::Amphipod::*;
 use self::Position::*;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::{env, error};
 
@@ -422,16 +421,6 @@ impl<const N: usize> Burrow<N> {
         positions
     }
 
-    fn amphipod_at_position(&self, position: Position) -> Option<Amphipod> {
-        /* self.positions
-        .iter()
-        .enumerate()
-        .find(|(_, &p)| p == position)
-        .map(|(i, _)| Self::amphipod_at_position_index(i)) */
-
-        todo!()
-    }
-
     fn is_settled(&self) -> bool {
         self.positions().iter().all(|(amphipod, position)| {
             if let Room(room, _) = position {
@@ -458,56 +447,6 @@ impl<const N: usize> FromStr for Burrow<N> {
         });
 
         Ok(Burrow::new(initial_positions))
-    }
-}
-
-impl<const N: usize> Display for Burrow<N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "█████████████")?;
-        write!(f, "█")?;
-
-        for h in 0..11 {
-            write!(
-                f,
-                "{}",
-                self.amphipod_at_position(Hallway(h))
-                    .map(|amphipod| amphipod.to_string())
-                    .unwrap_or(String::from(" "))
-            )?;
-        }
-
-        writeln!(f, "█")?;
-        write!(f, "██")?;
-
-        for room in [A, B, C, D] {
-            write!(f, "█")?;
-            write!(
-                f,
-                "{}",
-                self.amphipod_at_position(Room(room, 0))
-                    .map(|amphipod| amphipod.to_string())
-                    .unwrap_or(String::from(" "))
-            )?;
-        }
-
-        writeln!(f, "███")?;
-        write!(f, "  ")?;
-
-        for room in [A, B, C, D] {
-            write!(f, "█")?;
-            write!(
-                f,
-                "{}",
-                self.amphipod_at_position(Room(room, 1))
-                    .map(|amphipod| amphipod.to_string())
-                    .unwrap_or(String::from(" "))
-            )?;
-        }
-
-        writeln!(f, "█")?;
-        writeln!(f, "  █████████")?;
-
-        Ok(())
     }
 }
 

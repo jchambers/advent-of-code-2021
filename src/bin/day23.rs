@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     if let Some(path) = args.get(1) {
         let burrow = Burrow::from_str(std::fs::read_to_string(path)?.as_str())?;
 
-        println!("Min cost to settle positions: {}", burrow.min_cost_to_resolve());
+        println!("Min cost to settle positions: {}", burrow.min_cost_to_resolve().unwrap());
 
         Ok(())
     } else {
@@ -185,14 +185,13 @@ impl Burrow {
         Self { positions }
     }
 
-    pub fn min_cost_to_resolve(&self) -> u32 {
+    pub fn min_cost_to_resolve(&self) -> Option<u32> {
         let mut visited_states = HashSet::new();
         let mut tentative_costs = BinaryHeap::new();
 
         tentative_costs.push(StateAndCost {
             cost: 0,
             state: *self,
-            heuristic_cost: self.min_cost_heuristic(),
         });
 
         while let Some(state_and_cost) = tentative_costs.pop() {
@@ -201,7 +200,7 @@ impl Burrow {
             }
 
             if state_and_cost.state.is_settled() {
-                return state_and_cost.cost;
+                return Some(state_and_cost.cost);
             }
 
             state_and_cost
@@ -213,38 +212,13 @@ impl Burrow {
                     tentative_costs.push(StateAndCost {
                         state: next_state,
                         cost: cost + state_and_cost.cost,
-                        heuristic_cost: cost
-                            + state_and_cost.cost
-                            + state_and_cost.state.min_cost_heuristic(),
                     })
                 });
 
             visited_states.insert(state_and_cost.state);
         }
 
-        todo!()
-    }
-
-    fn min_cost_heuristic(&self) -> u32 {
-        // To calculate the minimum cost to get "home" for any amphipod, ignore collisions and just
-        // assume that any amphipod can move immediately/directly to its destination. As a bit of a
-        // hack, assume both amphipods are heading for the deepest part of the room, then "refund"
-        // one such move.
-        let cost: u32 = self
-            .positions
-            .iter()
-            .enumerate()
-            .map(|(i, position)| {
-                let amphipod = Self::amphipod_at_position_index(i);
-                let destination = Room(amphipod, 1);
-
-                amphipod.cost_to_move(position.distance_to(&destination))
-            })
-            .sum();
-
-        // For the "refund," we know we'll move an A amphipod by one space, a B by one space, and so
-        // on. That adds up to 1111.
-        cost - 1111
+        None
     }
 
     fn amphipod_at_position_index(index: usize) -> Amphipod {
@@ -506,13 +480,12 @@ impl Display for Burrow {
 struct StateAndCost {
     state: Burrow,
     cost: u32,
-    heuristic_cost: u32,
 }
 
 impl Ord for StateAndCost {
     fn cmp(&self, other: &Self) -> Ordering {
         // Swap the "normal" order so we have a min-first heap
-        other.heuristic_cost.cmp(&self.heuristic_cost)
+        other.cost.cmp(&self.cost)
     }
 }
 
@@ -544,27 +517,6 @@ mod test {
 
         assert_eq!(0, Hallway(1).distance_to(&Hallway(1)));
         assert_eq!(0, Room(A, 0).distance_to(&Room(A, 0)));
-    }
-
-    #[test]
-    fn test_min_cost_heuristic() {
-        assert_eq!(
-            0,
-            Burrow::new([A, A, B, B, C, C, D, D]).min_cost_heuristic()
-        );
-
-        // #############
-        // #...........#
-        // ###D#C#C#A###
-        //   #A#C#C#D#
-        //   #########
-        //
-        // D moves 1 space out of the room, 6 spaces down the hall, and 1 space into the room for a
-        // total of 8. A moves 1 out, 6 over, and 1 into the room (also 8).
-        assert_eq!(
-            8008,
-            Burrow::new([D, A, B, B, C, C, A, D]).min_cost_heuristic()
-        );
     }
 
     #[test]
@@ -676,7 +628,7 @@ mod test {
     #[test]
     fn test_min_cost_to_resolve() {
         assert_eq!(
-            12521,
+            Some(12521),
             Burrow::new([B, A, C, D, B, C, D, A]).min_cost_to_resolve()
         );
     }

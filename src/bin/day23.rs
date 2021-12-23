@@ -1,15 +1,18 @@
 use self::Amphipod::*;
 use self::Position::*;
-use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::{env, error};
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+use std::{env, error};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let _input_string = std::fs::read_to_string(path)?;
+        let burrow = Burrow::from_str(std::fs::read_to_string(path)?.as_str())?;
+
+        println!("Min cost to settle positions: {}", burrow.min_cost_to_resolve());
 
         Ok(())
     } else {
@@ -34,6 +37,20 @@ impl Amphipod {
                 C => 100,
                 D => 1000,
             }
+    }
+}
+
+impl FromStr for Amphipod {
+    type Err = Box<dyn error::Error>;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        match string {
+            "A" => Ok(A),
+            "B" => Ok(B),
+            "C" => Ok(C),
+            "D" => Ok(D),
+            _ => Err(format!("Bad amphipod identifier: {}", string).into()),
+        }
     }
 }
 
@@ -175,7 +192,7 @@ impl Burrow {
         tentative_costs.push(StateAndCost {
             cost: 0,
             state: *self,
-            heuristic_cost: self.min_cost_heuristic()
+            heuristic_cost: self.min_cost_heuristic(),
         });
 
         while let Some(state_and_cost) = tentative_costs.pop() {
@@ -187,14 +204,18 @@ impl Burrow {
                 return state_and_cost.cost;
             }
 
-            state_and_cost.state.next_possible_states()
+            state_and_cost
+                .state
+                .next_possible_states()
                 .iter()
                 .filter(|(next_state, _)| !visited_states.contains(next_state))
                 .for_each(|&(next_state, cost)| {
                     tentative_costs.push(StateAndCost {
                         state: next_state,
                         cost: cost + state_and_cost.cost,
-                        heuristic_cost: cost + state_and_cost.cost + state_and_cost.state.min_cost_heuristic(),
+                        heuristic_cost: cost
+                            + state_and_cost.cost
+                            + state_and_cost.state.min_cost_heuristic(),
                     })
                 });
 
@@ -384,7 +405,8 @@ impl Burrow {
     }
 
     fn amphipod_at_position(&self, position: Position) -> Option<Amphipod> {
-        self.positions.iter()
+        self.positions
+            .iter()
             .enumerate()
             .find(|(_, &p)| p == position)
             .map(|(i, _)| Self::amphipod_at_position_index(i))
@@ -402,15 +424,47 @@ impl Burrow {
     }
 }
 
+impl FromStr for Burrow {
+    type Err = Box<dyn error::Error>;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        let mut lines = string.lines().skip(2).take(2);
+
+        let mut initial_positions = [A; 8];
+
+        lines
+            .next()
+            .unwrap()
+            .chars()
+            .filter_map(|c| Amphipod::from_str(c.to_string().as_str()).ok())
+            .enumerate()
+            .for_each(|(i, amphipod)| initial_positions[i * 2] = amphipod);
+
+        lines
+            .next()
+            .unwrap()
+            .chars()
+            .filter_map(|c| Amphipod::from_str(c.to_string().as_str()).ok())
+            .enumerate()
+            .for_each(|(i, amphipod)| initial_positions[(i * 2) + 1] = amphipod);
+
+        Ok(Burrow::new(initial_positions))
+    }
+}
+
 impl Display for Burrow {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "█████████████")?;
         write!(f, "█")?;
 
         for h in 0..11 {
-            write!(f, "{}", self.amphipod_at_position(Hallway(h))
-                .map(|amphipod| amphipod.to_string())
-                .unwrap_or(String::from(" ")))?;
+            write!(
+                f,
+                "{}",
+                self.amphipod_at_position(Hallway(h))
+                    .map(|amphipod| amphipod.to_string())
+                    .unwrap_or(String::from(" "))
+            )?;
         }
 
         writeln!(f, "█")?;
@@ -418,9 +472,13 @@ impl Display for Burrow {
 
         for room in [A, B, C, D] {
             write!(f, "█")?;
-            write!(f, "{}", self.amphipod_at_position(Room(room, 0))
-                .map(|amphipod| amphipod.to_string())
-                .unwrap_or(String::from(" ")))?;
+            write!(
+                f,
+                "{}",
+                self.amphipod_at_position(Room(room, 0))
+                    .map(|amphipod| amphipod.to_string())
+                    .unwrap_or(String::from(" "))
+            )?;
         }
 
         writeln!(f, "███")?;
@@ -428,9 +486,13 @@ impl Display for Burrow {
 
         for room in [A, B, C, D] {
             write!(f, "█")?;
-            write!(f, "{}", self.amphipod_at_position(Room(room, 1))
-                .map(|amphipod| amphipod.to_string())
-                .unwrap_or(String::from(" ")))?;
+            write!(
+                f,
+                "{}",
+                self.amphipod_at_position(Room(room, 1))
+                    .map(|amphipod| amphipod.to_string())
+                    .unwrap_or(String::from(" "))
+            )?;
         }
 
         writeln!(f, "█")?;
@@ -463,6 +525,7 @@ impl PartialOrd for StateAndCost {
 #[cfg(test)]
 mod test {
     use super::*;
+    use indoc::indoc;
 
     #[test]
     fn test_abs_diff() {
@@ -588,13 +651,20 @@ mod test {
 
         let expected_cost = 3000;
 
-        assert_eq!((expected_burrow, expected_cost), burrow.with_move(6, Hallway(0)));
+        assert_eq!(
+            (expected_burrow, expected_cost),
+            burrow.with_move(6, Hallway(0))
+        );
     }
 
     #[test]
     fn test_next_possible_states() {
-        assert!(Burrow::new([A, A, B, B, C, C, D, D]).next_possible_states().is_empty());
-        assert!(!Burrow::new([D, A, B, C, C, B, A, D]).next_possible_states().is_empty());
+        assert!(Burrow::new([A, A, B, B, C, C, D, D])
+            .next_possible_states()
+            .is_empty());
+        assert!(!Burrow::new([D, A, B, C, C, B, A, D])
+            .next_possible_states()
+            .is_empty());
     }
 
     #[test]
@@ -605,6 +675,24 @@ mod test {
 
     #[test]
     fn test_min_cost_to_resolve() {
-        assert_eq!(12521, Burrow::new([B, A, C, D, B, C, D, A]).min_cost_to_resolve());
+        assert_eq!(
+            12521,
+            Burrow::new([B, A, C, D, B, C, D, A]).min_cost_to_resolve()
+        );
+    }
+
+    #[test]
+    fn test_burrow_from_string() {
+        assert_eq!(
+            Burrow::new([B, A, C, D, B, C, D, A]),
+            Burrow::from_str(indoc! {"
+                #############
+                #...........#
+                ###B#C#B#D###
+                  #A#D#C#A#
+                  #########
+            "})
+            .unwrap()
+        )
     }
 }

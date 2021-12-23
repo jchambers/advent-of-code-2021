@@ -10,9 +10,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let burrow = Burrow::from_str(std::fs::read_to_string(path)?.as_str())?;
+        let burrow = Burrow::<2>::from_str(std::fs::read_to_string(path)?.as_str())?;
 
-        println!("Min cost to settle positions: {}", burrow.min_cost_to_resolve().unwrap());
+        println!(
+            "Min cost to settle positions: {}",
+            burrow.min_cost_to_resolve().unwrap()
+        );
 
         Ok(())
     } else {
@@ -130,57 +133,60 @@ impl Position {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-struct Burrow {
+struct Burrow<const N: usize> {
     // Each amphipod has a permanent slot in this array. The first two are A1 and A2, the next are
     // B1 and B2, and so on.
-    positions: [Position; 8],
+    positions: [[Position; N]; 4],
 }
 
-impl Burrow {
+impl<const N: usize> Burrow<N> {
     // Amphipods are given in order of their starting positions from left to right and top to
     // bottom. Example:
     //
     // #############
     // #...........#
-    // ###B#C#B#D###  -> B, A, C, D, B, C, D, A
+    // ###B#C#B#D###  -> [B, A], [C, D], [B, C], [D, A]
     //   #A#D#C#A#
     //   #########
-    pub fn new(initial_positions: [Amphipod; 8]) -> Self {
-        let mut amphipods_placed: HashMap<Amphipod, usize> =
-            vec![(A, 0), (B, 0), (C, 0), (D, 0)].into_iter().collect();
+    pub fn new(initial_positions: [[Amphipod; N]; 4]) -> Self {
+        let mut positions_by_amphipod_type = HashMap::new();
 
-        // Hack; pre-populate the position array with nonsense locations while we let things settle
-        let mut positions = [Hallway(0); 8];
-        let mut i = 0;
+        for room in 0..initial_positions.len() {
+            let room_type = match room {
+                0 => A,
+                1 => B,
+                2 => C,
+                3 => D,
+                _ => unreachable!(),
+            };
 
-        for room in [A, B, C, D] {
-            for space in [0, 1] {
-                // We know we're traversing the room spaces in order…
-                let position = Room(room, space);
-
-                // …but now we need to figure out which position that maps to in the burrow's
-                // position array (i.e. which amphipod is in that space).
-                let room_index = match initial_positions[i] {
-                    A => 0,
-                    B => 2,
-                    C => 4,
-                    D => 6,
-                };
-
-                let index = room_index + amphipods_placed.get(&initial_positions[i]).unwrap();
-
-                positions[index] = position;
-
-                amphipods_placed
-                    .entry(initial_positions[i])
-                    .and_modify(|placed| *placed += 1);
-                i += 1;
+            for space in 0..initial_positions[room].len() {
+                positions_by_amphipod_type
+                    .entry(initial_positions[room][space])
+                    .or_insert(Vec::new())
+                    .push(Room(room_type, space as u32))
             }
         }
 
-        assert!(positions
-            .iter()
-            .all(|position| matches!(position, Room(_, _))));
+        // Hack; pre-populate the position array with nonsense locations while we let things settle
+        let mut positions = [[Hallway(0); N]; 4];
+
+        for amphipod_type in [A, B, C, D] {
+            let room_index = Self::room_index_for_amphipod(amphipod_type);
+
+            positions[room_index] = positions_by_amphipod_type
+                .get(&amphipod_type)
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+        }
+
+        for room in 0..positions.len() {
+            assert!(positions[room]
+                .iter()
+                .all(|position| matches!(position, Room(_, _))));
+        }
 
         Self { positions }
     }
@@ -221,12 +227,12 @@ impl Burrow {
         None
     }
 
-    fn amphipod_at_position_index(index: usize) -> Amphipod {
-        match index {
-            0 | 1 => A,
-            2 | 3 => B,
-            4 | 5 => C,
-            _ => D,
+    fn room_index_for_amphipod(amphipod: Amphipod) -> usize {
+        match amphipod {
+            A => 0,
+            B => 1,
+            C => 2,
+            D => 3,
         }
     }
 
@@ -235,22 +241,21 @@ impl Burrow {
 
         let mut next_possible_states = Vec::new();
 
-        self.positions.iter().enumerate().for_each(|(i, position)| {
-            let amphipod = Self::amphipod_at_position_index(i);
-
+        for (amphipod, position) in self.positions() {
             match position {
-                &Hallway(h) => {
+                Hallway(h) => {
                     // If we're in the hallway, the only legal move is into our target room if
                     // it's empty or if it has one occupant of the correct type.
                     let destination_room = Position::room_position_in_hallway(amphipod);
 
                     if self.hallway_path_clear(h, destination_room) {
                         if let Some(space) = self.destination_space_within_room(amphipod) {
-                            next_possible_states.push(self.with_move(i, Room(amphipod, space)));
+                            next_possible_states
+                                .push(self.with_move(position, Room(amphipod, space)));
                         }
                     }
                 }
-                &Room(room, space) => {
+                Room(room, space) => {
                     // If we're in a room, there are a few possibilities:
                     //
                     // 1. We're in the right room, but are blocking somebody who needs to get
@@ -262,14 +267,14 @@ impl Burrow {
                     let should_move = if amphipod == room {
                         // We're in the right room, but are we blocking somebody who wants to
                         // get out?
-                        if space == 0 {
-                            // We're at the front of the room, so somebody MUST be at the back
-                            // of the room
-                            self.room_occupants(room)[1].unwrap() != room
-                        } else {
-                            // We're at the back of the room and should never move
-                            false
-                        }
+                        let occupants = self.room_occupants(room);
+
+                        occupants[space as usize..].iter()
+                            .any(|&maybe_occupant| if let Some(occupant) = maybe_occupant {
+                                occupant != room
+                            } else {
+                                false
+                            })
                     } else {
                         // We're in the wrong room and should definitely move
                         true
@@ -287,9 +292,10 @@ impl Burrow {
                             if destination_space.is_some()
                                 && self.hallway_path_clear(start_room_position, dest_room_position)
                             {
-                                next_possible_states.push(
-                                    self.with_move(i, Room(amphipod, destination_space.unwrap())),
-                                );
+                                next_possible_states.push(self.with_move(
+                                    position,
+                                    Room(amphipod, destination_space.unwrap()),
+                                ));
                             } else {
                                 // Looks like we're moving to the hallway instead
                                 for dest_hallway_position in LEGAL_HALLWAY_STOPS {
@@ -298,7 +304,10 @@ impl Burrow {
                                         dest_hallway_position,
                                     ) {
                                         next_possible_states.push(
-                                            self.with_move(i, Hallway(dest_hallway_position)),
+                                            self.with_move(
+                                                position,
+                                                Hallway(dest_hallway_position),
+                                            ),
                                         );
                                     }
                                 }
@@ -307,7 +316,7 @@ impl Burrow {
                     }
                 }
             }
-        });
+        }
 
         next_possible_states
     }
@@ -315,7 +324,7 @@ impl Burrow {
     fn hallway_path_clear(&self, start: u32, destination: u32) -> bool {
         let mut hallway = [true; 11];
 
-        for position in self.positions {
+        for (_, position) in self.positions() {
             if let Hallway(h) = position {
                 hallway[h as usize] = false;
             }
@@ -331,23 +340,18 @@ impl Burrow {
     }
 
     fn path_to_hallway_clear(&self, room: Amphipod, space: u32) -> bool {
-        if space == 0 {
-            true
-        } else {
-            // We're in the back of the room; is anybody in the front?
-            let front_of_room = Room(room, 0);
-
-            !self.positions.iter().any(|&p| p == front_of_room)
-        }
+        self.room_occupants(room)[0..space as usize]
+            .iter()
+            .all(Option::is_none)
     }
 
-    fn room_occupants(&self, room: Amphipod) -> [Option<Amphipod>; 2] {
-        let mut occupants = [None; 2];
+    fn room_occupants(&self, room: Amphipod) -> [Option<Amphipod>; N] {
+        let mut occupants = [None; N];
 
-        for i in 0..self.positions.len() {
-            if let Room(r, space) = self.positions[i] {
+        for (amphipod, position) in self.positions() {
+            if let Room(r, space) = position {
                 if r == room {
-                    occupants[space as usize] = Some(Self::amphipod_at_position_index(i));
+                    occupants[space as usize] = Some(amphipod);
                 }
             }
         }
@@ -358,75 +362,99 @@ impl Burrow {
     fn destination_space_within_room(&self, amphipod: Amphipod) -> Option<u32> {
         let occupants = self.room_occupants(amphipod);
 
-        if occupants == [None, None] {
-            Some(1)
-        } else if occupants == [None, Some(amphipod)] {
-            Some(0)
-        } else {
-            None
+        for space in (0..N).rev() {
+            match occupants[space] {
+                None => return Some(space as u32),
+                Some(occupant) => {
+                    if occupant != amphipod {
+                        return None;
+                    }
+                }
+            }
         }
+
+        None
     }
 
-    fn with_move(&self, amphipod_index: usize, destination: Position) -> (Self, u32) {
-        let mut positions = self.positions.clone();
+    fn with_move(&self, start: Position, destination: Position) -> (Self, u32) {
+        for i in 0..self.positions.len() {
+            for j in 0..N {
+                if self.positions[i][j] == start {
+                    let amphipod = match i {
+                        0 => A,
+                        1 => B,
+                        2 => C,
+                        3 => D,
+                        _ => unreachable!(),
+                    };
 
-        let amphipod = Self::amphipod_at_position_index(amphipod_index);
-        let cost = amphipod.cost_to_move(positions[amphipod_index].distance_to(&destination));
+                    let mut with_move = self.clone();
+                    with_move.positions[i][j] = destination;
 
-        positions[amphipod_index] = destination;
+                    let cost = amphipod.cost_to_move(start.distance_to(&destination));
 
-        (Burrow { positions }, cost)
+                    return (with_move, cost);
+                }
+            }
+        }
+
+        unreachable!();
+    }
+
+    fn positions(&self) -> Vec<(Amphipod, Position)> {
+        let mut positions = Vec::with_capacity(self.positions.len() * N);
+
+        for amphipod_type in [A, B, C, D] {
+            let room = Self::room_index_for_amphipod(amphipod_type);
+
+            for subscript in 0..N {
+                positions.push((amphipod_type, self.positions[room][subscript]))
+            }
+        }
+
+        positions
     }
 
     fn amphipod_at_position(&self, position: Position) -> Option<Amphipod> {
-        self.positions
-            .iter()
-            .enumerate()
-            .find(|(_, &p)| p == position)
-            .map(|(i, _)| Self::amphipod_at_position_index(i))
+        /* self.positions
+        .iter()
+        .enumerate()
+        .find(|(_, &p)| p == position)
+        .map(|(i, _)| Self::amphipod_at_position_index(i)) */
+
+        todo!()
     }
 
     fn is_settled(&self) -> bool {
-        matches!(self.positions[0], Room(A, _))
-            && matches!(self.positions[1], Room(A, _))
-            && matches!(self.positions[2], Room(B, _))
-            && matches!(self.positions[3], Room(B, _))
-            && matches!(self.positions[4], Room(C, _))
-            && matches!(self.positions[5], Room(C, _))
-            && matches!(self.positions[6], Room(D, _))
-            && matches!(self.positions[7], Room(D, _))
+        self.positions().iter().all(|(amphipod, position)| {
+            if let Room(room, _) = position {
+                amphipod == room
+            } else {
+                false
+            }
+        })
     }
 }
 
-impl FromStr for Burrow {
+impl<const N: usize> FromStr for Burrow<N> {
     type Err = Box<dyn error::Error>;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        let mut lines = string.lines().skip(2).take(2);
+        let lines = string.lines().skip(2).take(N);
+        let mut initial_positions = [[A; N]; 4];
 
-        let mut initial_positions = [A; 8];
-
-        lines
-            .next()
-            .unwrap()
-            .chars()
-            .filter_map(|c| Amphipod::from_str(c.to_string().as_str()).ok())
-            .enumerate()
-            .for_each(|(i, amphipod)| initial_positions[i * 2] = amphipod);
-
-        lines
-            .next()
-            .unwrap()
-            .chars()
-            .filter_map(|c| Amphipod::from_str(c.to_string().as_str()).ok())
-            .enumerate()
-            .for_each(|(i, amphipod)| initial_positions[(i * 2) + 1] = amphipod);
+        lines.enumerate().for_each(|(space, line)| {
+            line.chars()
+                .filter_map(|c| Amphipod::from_str(c.to_string().as_str()).ok())
+                .enumerate()
+                .for_each(|(room, amphipod)| initial_positions[room][space] = amphipod);
+        });
 
         Ok(Burrow::new(initial_positions))
     }
 }
 
-impl Display for Burrow {
+impl<const N: usize> Display for Burrow<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "█████████████")?;
         write!(f, "█")?;
@@ -477,19 +505,19 @@ impl Display for Burrow {
 }
 
 #[derive(Eq, PartialEq)]
-struct StateAndCost {
-    state: Burrow,
+struct StateAndCost<const N: usize> {
+    state: Burrow<N>,
     cost: u32,
 }
 
-impl Ord for StateAndCost {
+impl<const N: usize> Ord for StateAndCost<N> {
     fn cmp(&self, other: &Self) -> Ordering {
         // Swap the "normal" order so we have a min-first heap
         other.cost.cmp(&self.cost)
     }
 }
 
-impl PartialOrd for StateAndCost {
+impl<const N: usize> PartialOrd<Self> for StateAndCost<N> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -521,24 +549,26 @@ mod test {
 
     #[test]
     fn test_room_occupants() {
-        let mut burrow = Burrow::new([D, A, B, B, C, C, A, D]);
+        let mut burrow = Burrow::new([[D, A], [B, B], [C, C], [A, D]]);
 
         assert_eq!([Some(D), Some(A)], burrow.room_occupants(A));
 
-        burrow.positions[6] = Hallway(0);
+        // Move D into the hallway
+        burrow.positions[3][0] = Hallway(0);
         assert_eq!([None, Some(A)], burrow.room_occupants(A));
 
-        burrow.positions[0] = Hallway(1);
+        // Move A into the hallway
+        burrow.positions[0][0] = Hallway(1);
         assert_eq!([None, None], burrow.room_occupants(A));
     }
 
     #[test]
     fn test_hallway_path_clear() {
-        let mut burrow = Burrow::new([D, A, B, B, C, C, A, D]);
+        let mut burrow = Burrow::new([[D, A], [B, B], [C, C], [A, D]]);
 
         assert!(burrow.hallway_path_clear(0, 10));
 
-        burrow.positions[6] = Hallway(5);
+        burrow.positions[3][0] = Hallway(5);
 
         assert!(!burrow.hallway_path_clear(0, 10));
         assert!(!burrow.hallway_path_clear(10, 0));
@@ -551,53 +581,49 @@ mod test {
 
     #[test]
     fn test_destination_space_within_room() {
-        let mut burrow = Burrow::new([D, A, B, C, C, B, A, D]);
+        let mut burrow = Burrow::new([[D, A], [B, C], [C, B], [A, D]]);
 
         assert!(burrow.destination_space_within_room(A).is_none());
 
         // Move D from the A room into the hallway
-        burrow.positions[6] = Hallway(0);
+        burrow.positions[3][0] = Hallway(0);
 
         assert_eq!(0, burrow.destination_space_within_room(A).unwrap());
 
         // Move A from the A room into the hallway
-        burrow.positions[0] = Hallway(1);
+        burrow.positions[0][0] = Hallway(1);
 
         assert_eq!(1, burrow.destination_space_within_room(A).unwrap());
 
         // Move B from the B room into the hallway, leaving C in place
-        burrow.positions[2] = Hallway(10);
+        burrow.positions[1][0] = Hallway(10);
 
         assert!(burrow.destination_space_within_room(B).is_none());
     }
 
     #[test]
     fn test_path_to_hallway_clear() {
-        let mut burrow = Burrow::new([D, A, B, C, C, B, A, D]);
+        let mut burrow = Burrow::new([[D, A], [B, C], [C, B], [A, D]]);
 
         assert!(burrow.path_to_hallway_clear(A, 0));
         assert!(!burrow.path_to_hallway_clear(A, 1));
 
         // Move D from the A room into the hallway
-        burrow.positions[6] = Hallway(0);
+        burrow.positions[3][0] = Hallway(0);
 
         assert!(burrow.path_to_hallway_clear(A, 1));
     }
 
     #[test]
     fn test_with_move() {
-        let burrow = Burrow::new([D, A, B, C, C, B, A, D]);
+        let burrow = Burrow::new([[D, A], [B, C], [C, B], [A, D]]);
 
         let expected_burrow = Burrow {
             positions: [
-                Room(A, 1),
-                Room(D, 0),
-                Room(B, 0),
-                Room(C, 1),
-                Room(B, 1),
-                Room(C, 0),
-                Hallway(0),
-                Room(D, 1),
+                [Room(A, 1), Room(D, 0)],
+                [Room(B, 0), Room(C, 1)],
+                [Room(B, 1), Room(C, 0)],
+                [Hallway(0), Room(D, 1)],
             ],
         };
 
@@ -605,38 +631,44 @@ mod test {
 
         assert_eq!(
             (expected_burrow, expected_cost),
-            burrow.with_move(6, Hallway(0))
+            burrow.with_move(Room(A, 0), Hallway(0))
         );
     }
 
     #[test]
     fn test_next_possible_states() {
-        assert!(Burrow::new([A, A, B, B, C, C, D, D])
+        assert!(Burrow::new([[A, A], [B, B], [C, C], [D, D]])
             .next_possible_states()
             .is_empty());
-        assert!(!Burrow::new([D, A, B, C, C, B, A, D])
+
+        assert!(!Burrow::new([[D, A], [B, C], [C, B], [A, D]])
             .next_possible_states()
             .is_empty());
     }
 
     #[test]
     fn test_is_settled() {
-        assert!(Burrow::new([A, A, B, B, C, C, D, D]).is_settled());
-        assert!(!Burrow::new([D, A, B, C, C, B, A, D]).is_settled());
+        assert!(Burrow::new([[A, A], [B, B], [C, C], [D, D]]).is_settled());
+        assert!(!Burrow::new([[D, A], [B, C], [C, B], [A, D]]).is_settled());
     }
 
     #[test]
     fn test_min_cost_to_resolve() {
         assert_eq!(
             Some(12521),
-            Burrow::new([B, A, C, D, B, C, D, A]).min_cost_to_resolve()
+            Burrow::new([[B, A], [C, D], [B, C], [D, A]]).min_cost_to_resolve()
+        );
+
+        assert_eq!(
+            Some(44169),
+            Burrow::new([[B, D, D, A], [C, C, B, D], [B, B, A, C], [D, A, C, A]]).min_cost_to_resolve()
         );
     }
 
     #[test]
     fn test_burrow_from_string() {
         assert_eq!(
-            Burrow::new([B, A, C, D, B, C, D, A]),
+            Burrow::new([[B, A], [C, D], [B, C], [D, A]]),
             Burrow::from_str(indoc! {"
                 #############
                 #...........#
@@ -645,6 +677,20 @@ mod test {
                   #########
             "})
             .unwrap()
-        )
+        );
+
+        assert_eq!(
+            Burrow::new([[B, D, D, A], [C, C, B, D], [B, B, A, C], [D, A, C, A]]),
+            Burrow::from_str(indoc! {"
+                #############
+                #...........#
+                ###B#C#B#D###
+                  #D#C#B#A#
+                  #D#B#A#C#
+                  #A#D#C#A#
+                  #########
+            "})
+            .unwrap()
+        );
     }
 }

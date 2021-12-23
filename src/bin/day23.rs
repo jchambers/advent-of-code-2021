@@ -1,12 +1,12 @@
-use std::fs::File;
-use std::io::BufRead;
-use std::{env, error, io};
+use self::Amphipod::*;
+use self::Position::*;
+use std::collections::HashMap;
+use std::{env, error};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let _lines = io::BufReader::new(File::open(path)?).lines();
         let _input_string = std::fs::read_to_string(path)?;
 
         Ok(())
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum Amphipod {
     A,
     B,
@@ -24,112 +24,76 @@ enum Amphipod {
 }
 
 impl Amphipod {
-    fn destination_room_index(&self) -> usize {
-        match self {
-            Amphipod::A => 0,
-            Amphipod::B => 1,
-            Amphipod::C => 2,
-            Amphipod::D => 3,
-        }
-    }
-
     #[inline]
-    fn destination_room_position(&self) -> usize {
-        match self {
-            Amphipod::A => 2,
-            Amphipod::B => 4,
-            Amphipod::C => 6,
-            Amphipod::D => 8,
-        }
-    }
-
-    #[inline]
-    fn cost_to_move(&self, distance: usize) -> u32 {
+    fn cost_to_move(&self, distance: u32) -> u32 {
         distance as u32
             * match self {
-                Amphipod::A => 1,
-                Amphipod::B => 10,
-                Amphipod::C => 100,
-                Amphipod::D => 1000,
+                A => 1,
+                B => 10,
+                C => 100,
+                D => 1000,
             }
     }
 }
 
-// #############
-// #...........#
-// ###A#B#C#D###
-//   #A#B#C#D#
-//   #########
-struct Burrow {
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Position {
     // Hallway spaces are numbered left to right; the entrance to the first room is at 2, the second
     // is at 4, etc.
-    hallway: [Option<Amphipod>; 11],
+    Hallway(u32),
 
-    // Rooms are numbered from left to right; A wants to be in 0, B in 1, etc.. Within a room,
-    // spaces are numbered from the bottom up (0 is at the bottom, 1 is adjacent to the hallway).
-    rooms: [[Option<Amphipod>; 2]; 4],
+    // Rooms are labeled by the kind of amphipod that wants to "live" there; within a room, spaces
+    // are numbered from the top down (0 is adjacent to the hallway, 1 is at the bottom).
+    Room(Amphipod, u32),
 }
 
-impl Burrow {
-    pub fn new(rooms: [[Amphipod; 2]; 4]) -> Self {
-        Burrow {
-            hallway: [None; 11],
-            rooms: rooms
-                .iter()
-                .map(|room| [Some(room[0]), Some(room[1])])
-                .collect::<Vec<[Option<Amphipod>; 2]>>()
-                .try_into()
-                .unwrap(),
+impl Position {
+    pub fn distance_to(&self, other: &Position) -> u32 {
+        match (self, other) {
+            (&Hallway(start), &Hallway(dest)) => Self::abs_diff(start, dest),
+            (&Hallway(start), &Room(dest_amphipod, dest_position)) => {
+                let within_hallway =
+                    Self::abs_diff(start, Self::room_position_in_hallway(dest_amphipod));
+                let from_hallway = dest_position + 1;
+
+                within_hallway + from_hallway
+            }
+            (&Room(start_amphipod, start_position), &Room(dest_amphipod, dest_position)) => {
+                if start_amphipod == dest_amphipod {
+                    Self::abs_diff(start_position, dest_position)
+                } else {
+                    let to_hallway = start_position + 1;
+                    let within_hallway = Self::abs_diff(
+                        Self::room_position_in_hallway(start_amphipod),
+                        Self::room_position_in_hallway(dest_amphipod),
+                    );
+                    let from_hallway = dest_position + 1;
+
+                    to_hallway + within_hallway + from_hallway
+                }
+            }
+            (&Room(start_amphipod, start_position), &Hallway(dest)) => {
+                let to_hallway = start_position + 1;
+                let within_hallway =
+                    Self::abs_diff(Self::room_position_in_hallway(start_amphipod), dest);
+
+                to_hallway + within_hallway
+            }
         }
     }
 
-    fn min_cost_to_resolve(&self) -> u32 {
-        // To calculate the minimum cost to get "home" for any amphipod, ignore collisions and just
-        // assume that any amphipod can move immediately/directly to its destination. As a bit of a
-        // hack, assume both amphipods are heading for the deepest part of the room, then "refund"
-        // one such move.
-        let mut cost = 0;
-
-        // For anybody in the hallway, move laterally to the destination room, then two spaces in
-        self.hallway
-            .iter()
-            .enumerate()
-            .filter_map(|(position, maybe_amphipod)| maybe_amphipod.map(|a| (position, a)))
-            .for_each(|(position, amphipod)| {
-                // Plus two for the two spaces into the back of the room
-                cost += amphipod.cost_to_move(Self::abs_diff(
-                    position,
-                    amphipod.destination_room_index() + 2,
-                ))
-            });
-
-        // For everybody in a room, move out of the room if it's not the right one, then down the
-        // hallway, then into the right room. If already in the right room, move toward the back.
-        self.rooms.iter().enumerate().for_each(|(room, spaces)| {
-            spaces
-                .iter()
-                .enumerate()
-                .filter_map(|(position, maybe_amphipod)| maybe_amphipod.map(|a| (position, a)))
-                .for_each(|(position, amphipod)| {
-                    if room == amphipod.destination_room_index() {
-                        // We're already in the right room and just need to move to the back
-                        cost += amphipod.cost_to_move(position);
-                    } else {
-                        let spaces_to_leave_room = 2 - position;
-                        let hallway_distance =
-                            2 * Self::abs_diff(room, amphipod.destination_room_index());
-
-                        cost += amphipod.cost_to_move(spaces_to_leave_room + hallway_distance + 2);
-                    }
-                });
-        });
-
-        // For the refund, we know we'll move an A amphipod by one space, a B by one space, and so
-        // on. That adds up to 1111.
-        cost - 1111
+    #[inline]
+    fn room_position_in_hallway(amphipod: Amphipod) -> u32 {
+        match amphipod {
+            A => 2,
+            B => 4,
+            C => 6,
+            D => 8,
+        }
     }
 
-    fn abs_diff(a: usize, b: usize) -> usize {
+    #[inline]
+    fn abs_diff(a: u32, b: u32) -> u32 {
         if a > b {
             a - b
         } else {
@@ -138,23 +102,130 @@ impl Burrow {
     }
 }
 
+#[derive(Debug)]
+struct Burrow {
+    // Each amphipod has a permanent slot in this array. The first two are A1 and A2, the next are
+    // B1 and B2, and so on.
+    positions: [Position; 8],
+}
+
+impl Burrow {
+    // Amphipods are given in order of their starting positions from left to right and top to
+    // bottom. Example:
+    //
+    // #############
+    // #...........#
+    // ###B#C#B#D###  -> B, A, C, D, B, C, D, A
+    //   #A#D#C#A#
+    //   #########
+    pub fn new(initial_positions: [Amphipod; 8]) -> Self {
+        let mut amphipods_placed: HashMap<Amphipod, usize> =
+            vec![(A, 0), (B, 0), (C, 0), (D, 0)].into_iter().collect();
+
+        // Hack; pre-populate the position array with nonsense locations while we let things settle
+        let mut positions = [Hallway(0); 8];
+        let mut i = 0;
+
+        for room in [A, B, C, D] {
+            for space in [0, 1] {
+                // We know we're traversing the room spaces in order…
+                let position = Room(room, space);
+
+                // …but now we need to figure out which position that maps to in the burrow's
+                // position array (i.e. which amphipod is in that space).
+                let room_index = match initial_positions[i] {
+                    A => 0,
+                    B => 2,
+                    C => 4,
+                    D => 6,
+                };
+
+                let index = room_index + amphipods_placed.get(&initial_positions[i]).unwrap();
+
+                positions[index] = position;
+
+                amphipods_placed.entry(initial_positions[i]).and_modify(|placed| *placed += 1);
+                i += 1;
+            }
+        }
+
+        assert!(positions.iter().all(|position| matches!(position, Room(_, _))));
+
+        Self { positions }
+    }
+
+    fn min_cost_to_resolve(&self) -> u32 {
+        // To calculate the minimum cost to get "home" for any amphipod, ignore collisions and just
+        // assume that any amphipod can move immediately/directly to its destination. As a bit of a
+        // hack, assume both amphipods are heading for the deepest part of the room, then "refund"
+        // one such move.
+        let cost: u32 = self.positions.iter()
+            .enumerate()
+            .map(|(i, position)| {
+                let amphipod = Self::amphipod_at_position_index(i);
+                let destination = Room(amphipod, 1);
+
+                amphipod.cost_to_move(position.distance_to(&destination))
+            })
+            .sum();
+
+        // For the "refund," we know we'll move an A amphipod by one space, a B by one space, and so
+        // on. That adds up to 1111.
+        cost - 1111
+    }
+
+    #[inline]
+    fn amphipod_at_position_index(index: usize) -> Amphipod {
+        match index {
+            0 | 1 => A,
+            2 | 3 => B,
+            4 | 5 => C,
+            _ => D,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::Amphipod::*;
     use super::*;
 
     #[test]
     fn test_abs_diff() {
-        assert_eq!(2, Burrow::abs_diff(5, 3));
-        assert_eq!(2, Burrow::abs_diff(3, 5));
+        assert_eq!(2, Position::abs_diff(5, 3));
+        assert_eq!(2, Position::abs_diff(3, 5));
+    }
+
+    #[test]
+    fn test_distance_to() {
+        assert_eq!(4, Hallway(1).distance_to(&Hallway(5)));
+        assert_eq!(4, Hallway(5).distance_to(&Hallway(1)));
+        assert_eq!(5, Hallway(1).distance_to(&Room(B, 1)));
+        assert_eq!(5, Room(B, 1).distance_to(&Hallway(1)));
+        assert_eq!(1, Room(A, 0).distance_to(&Room(A, 1)));
+        assert_eq!(5, Room(A, 0).distance_to(&Room(B, 1)));
+
+        assert_eq!(0, Hallway(1).distance_to(&Hallway(1)));
+        assert_eq!(0, Room(A, 0).distance_to(&Room(A, 0)));
     }
 
     #[test]
     fn test_min_cost_to_resolve() {
-        assert_eq!(0, Burrow::new([[A, A], [B, B], [C, C], [D, D]]).min_cost_to_resolve());
+        assert_eq!(
+            0,
+            Burrow::new([A, A, B, B, C, C, D, D]).min_cost_to_resolve()
+        );
 
+        // #############
+        // #...........#
+        // ###D#C#C#A###
+        //   #A#C#C#D#
+        //   #########
+        //
         // D moves 1 space out of the room, 6 spaces down the hall, and 1 space into the room for a
         // total of 8. A moves 1 out, 6 over, and 1 into the room (also 8).
-        assert_eq!(8008, Burrow::new([[A, D], [B, B], [C, C], [D, A]]).min_cost_to_resolve());
+        assert_eq!(
+            8008,
+            Burrow::new([D, A, B, B, C, C, A, D]).min_cost_to_resolve()
+        );
     }
 }

@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             });
 
             instructions.iter()
-                .for_each(|instruction| small_reactor.apply_instruction(&instruction));
+                .for_each(|instruction| small_reactor.apply_instruction(instruction));
 
             println!("Active cubes in small reactor: {}", small_reactor.active_cubes());
         }
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             });
 
             instructions.iter()
-                .for_each(|instruction| large_reactor.apply_instruction(&instruction));
+                .for_each(|instruction| large_reactor.apply_instruction(instruction));
 
             println!("Active cubes in large reactor: {}", large_reactor.active_cubes());
         }
@@ -341,10 +341,10 @@ impl FromStr for Instruction {
     type Err = Box<dyn error::Error>;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        if string.starts_with("on ") {
-            Ok(On(Cuboid::from_str(&string[3..])?))
-        } else if string.starts_with("off ") {
-            Ok(Off(Cuboid::from_str(&string[4..])?))
+        if let Some(remainder) = string.strip_prefix("on ") {
+            Ok(On(Cuboid::from_str(remainder)?))
+        } else if let Some(remainder) = string.strip_prefix("off ") {
+            Ok(Off(Cuboid::from_str(remainder)?))
         } else {
             Err(format!("Could not parse instruction: {}", string).into())
         }

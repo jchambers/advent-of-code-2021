@@ -1,7 +1,9 @@
 use self::Register::*;
 use self::Value::*;
+use self::Instruction::*;
 use std::fs::File;
 use std::io::BufRead;
+use std::str::FromStr;
 use std::{env, error, io};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
@@ -16,6 +18,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
 enum Register {
     W,
     X,
@@ -35,6 +38,21 @@ impl Register {
     }
 }
 
+impl FromStr for Register {
+    type Err = Box<dyn error::Error>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "w" => Ok(Register::W),
+            "x" => Ok(Register::X),
+            "y" => Ok(Register::Y),
+            "z" => Ok(Register::Z),
+            _ => Err(format!("Not a valid register: {}", s).into()),
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
 enum Value {
     Literal(i64),
     Register(Register),
@@ -50,6 +68,21 @@ impl Value {
     }
 }
 
+impl FromStr for Value {
+    type Err = Box<dyn error::Error>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(register) = Register::from_str(s) {
+            Ok(Register(register))
+        } else if let Ok(literal) = i64::from_str(s) {
+            Ok(Literal(literal))
+        } else {
+            Err(format!("Not a valid value: {}", s).into())
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
 enum Instruction {
     Input(Register),
     Add(Register, Value),
@@ -57,6 +90,36 @@ enum Instruction {
     Divide(Register, Value),
     Modulo(Register, Value),
     Compare(Register, Value),
+}
+
+impl FromStr for Instruction {
+    type Err = Box<dyn error::Error>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut components = s.split_whitespace();
+
+        let instruction: Result<&str, &str> = components.next().ok_or("No instruction".into());
+
+        let register: Result<Result<Register, Box<dyn std::error::Error>>, &str> = components
+            .next()
+            .ok_or("No register".into())
+            .map(|r| Register::from_str(r));
+
+        let value: Result<Result<Value, Box<dyn std::error::Error>>, &str> = components
+            .next()
+            .ok_or("No value".into())
+            .map(|v| Value::from_str(v));
+
+        match instruction? {
+            "inp" => Ok(Input(register??)),
+            "add" => Ok(Add(register??, value??)),
+            "mul" => Ok(Multiply(register??, value??)),
+            "div" => Ok(Divide(register??, value??)),
+            "mod" => Ok(Modulo(register??, value??)),
+            "eql" => Ok(Compare(register??, value??)),
+            _ => Err(format!("Unrecognized instruction: {}", instruction?).into()),
+        }
+    }
 }
 
 struct ArithmeticLogicUnit {
@@ -107,10 +170,18 @@ impl ArithmeticLogicUnit {
 
 #[cfg(test)]
 mod test {
-    use super::Instruction::*;
-    use super::Register::*;
     use super::*;
     use crate::Value::{Literal, Register};
+
+    #[test]
+    fn test_instruction_from_string() {
+        assert_eq!(Input(W), Instruction::from_str("inp w").unwrap());
+        assert_eq!(Add(X, Literal(4)), Instruction::from_str("add x 4").unwrap());
+        assert_eq!(Multiply(Y, Register(Z)), Instruction::from_str("mul y z").unwrap());
+        assert_eq!(Divide(Z, Literal(-7)), Instruction::from_str("div z -7").unwrap());
+        assert_eq!(Modulo(W, Register(X)), Instruction::from_str("mod w x").unwrap());
+        assert_eq!(Compare(X, Register(Y)), Instruction::from_str("eql x y").unwrap());
+    }
 
     #[test]
     fn test_execute() {

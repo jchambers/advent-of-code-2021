@@ -16,6 +16,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
         println!("Largest valid model number: {}", largest_valid_model_number(&instructions).unwrap());
 
+        /* let model_number = ModelNumber { digits: [1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5] };
+        let alu = ArithmeticLogicUnit::new(&instructions);
+
+        println!("From ALU: {:?}", alu.execute(&model_number.digits));
+        println!("By cheating: {}", cheat(&model_number)); */
+
         Ok(())
     } else {
         Err("Usage: day24 INPUT_FILE_PATH".into())
@@ -23,7 +29,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 fn largest_valid_model_number(instructions: &[Instruction]) -> Option<u64> {
-    let alu = ArithmeticLogicUnit::new(instructions);
+    /* let alu = ArithmeticLogicUnit::new(instructions);
     let model_numbers = ModelNumbers::new();
 
     for model_number in model_numbers {
@@ -32,7 +38,48 @@ fn largest_valid_model_number(instructions: &[Instruction]) -> Option<u64> {
         }
     }
 
+    None */
+
+    let model_numbers = ModelNumbers::new();
+
+    let mut i = 0;
+
+    for model_number in model_numbers {
+        if checksum(&model_number) == 0 {
+            return Some(model_number.into());
+        }
+
+        i += 1;
+
+        if i % 100_000_000 == 0 {
+            println!("Model number: {:?}", model_number);
+        }
+    }
+
     None
+}
+
+fn checksum(model_number: &ModelNumber) -> i64 {
+    const A: [i64; 14] = [11, 13, 15, -8, 13, 15, -11, -4, -15, 14, 14, -1, -8, -14];
+    const B: [i64; 14] = [6, 14, 14, 10, 9, 12, 8, 13, 12, 6, 9, 15, 4, 10];
+
+    let mut checksum = 0;
+
+    for i in 0..14 {
+        let shift_left = (checksum % 26) + A[i] != model_number.digits[i];
+        let shift_right = A[i] < 0;
+
+        if shift_right {
+            checksum /= 26;
+        }
+
+        if shift_left {
+            checksum *= 26;
+            checksum += (model_number.digits[i] + B[i])
+        }
+    }
+
+    checksum
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

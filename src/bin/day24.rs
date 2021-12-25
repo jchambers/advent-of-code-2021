@@ -10,7 +10,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if let Some(path) = args.get(1) {
-        let _lines = io::BufReader::new(File::open(path)?).lines();
+        let instructions: Vec<Instruction> = io::BufReader::new(File::open(path)?).lines()
+            .map(|line| Instruction::from_str(line.unwrap().as_str()))
+            .collect::<Result<Vec<Instruction>, Box<dyn error::Error>>>()?;
+
+        println!("Largest valid model number: {}", largest_valid_model_number(&instructions).unwrap());
 
         Ok(())
     } else {
@@ -18,7 +22,20 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+fn largest_valid_model_number(instructions: &[Instruction]) -> Option<u64> {
+    let alu = ArithmeticLogicUnit::new(instructions);
+    let model_numbers = ModelNumbers::new();
+
+    for model_number in model_numbers {
+        if alu.execute(&model_number.digits)[3] == 0 {
+            return Some(model_number.into());
+        }
+    }
+
+    None
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum Register {
     W,
     X,
@@ -52,7 +69,7 @@ impl FromStr for Register {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum Value {
     Literal(i64),
     Register(Register),
@@ -82,7 +99,7 @@ impl FromStr for Value {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum Instruction {
     Input(Register),
     Add(Register, Value),
@@ -127,6 +144,12 @@ struct ArithmeticLogicUnit {
 }
 
 impl ArithmeticLogicUnit {
+    pub fn new(instructions: &[Instruction]) -> Self {
+        ArithmeticLogicUnit {
+            instructions: instructions.iter().cloned().collect()
+        }
+    }
+
     pub fn execute(&self, inputs: &[i64]) -> [i64; 4] {
         let mut registers = [0; 4];
         let mut read_index = 0;
@@ -165,6 +188,53 @@ impl ArithmeticLogicUnit {
         }
 
         registers
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ModelNumber {
+    digits: [i64; 14],
+}
+
+impl From<ModelNumber> for u64 {
+    fn from(model_number: ModelNumber) -> Self {
+        model_number.digits.iter()
+            .fold(0, |m, digit| (m * 10) + *digit as u64)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ModelNumbers {
+    current: u64,
+}
+
+impl ModelNumbers {
+    pub fn new() -> Self {
+        ModelNumbers {
+            current: 205_891_132_094_649 // 9^15
+        }
+    }
+}
+
+impl Iterator for ModelNumbers {
+    type Item = ModelNumber;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current > 0 {
+            self.current -= 1;
+
+            let mut remainder = self.current;
+            let mut digits = [0; 14];
+
+            for digit in (0..14).rev() {
+                digits[digit] = ((remainder % 9) + 1) as i64;
+                remainder /= 9;
+            }
+
+            Some(ModelNumber { digits })
+        } else {
+            None
+        }
     }
 }
 
@@ -227,5 +297,26 @@ mod test {
             assert_eq!([1, 0, 1, 0], alu.execute(&[0b1010]));
             assert_eq!([0, 1, 0, 1], alu.execute(&[0b0101]));
         }
+    }
+
+    #[test]
+    fn test_model_number_to_u64() {
+        assert_eq!(99999999999999u64, ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9]}.into());
+    }
+
+    #[test]
+    fn test_model_numbers() {
+        let mut model_numbers = ModelNumbers::new();
+
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 7]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 3]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 2]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 1]}), model_numbers.next());
+        assert_eq!(Some(ModelNumber{ digits: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 9]}), model_numbers.next());
     }
 }

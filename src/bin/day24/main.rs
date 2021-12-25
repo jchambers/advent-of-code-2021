@@ -35,6 +35,8 @@ fn explore_model_number(
     preceding_digits: &[i64],
     direction: Direction,
 ) -> Option<[i64; 14]> {
+    // These widths are specific to my individual problem input and are derived from the positions
+    // of the negative coefficients in A (see ::checksum).
     const CHUNK_WIDTHS: [usize; 7] = [4, 3, 1, 1, 3, 1, 1];
 
     let digits = Digits::new(CHUNK_WIDTHS[chunk], direction);
@@ -64,6 +66,14 @@ fn explore_model_number(
 }
 
 fn checksum(digits: &[i64]) -> (i64, bool) {
+    // So where did all this come from? This is the result of manually "decompiling" the ALU
+    // instructions from the problem input. The main goal was just to produce something where the
+    // operation of the model number verification doodad was easier to read and understand, but this
+    // also has the nice side effect of making it much faster to run.
+    //
+    // It turns out that the same set of instructions get repeated for each digit, but with
+    // different parameters/coefficients in a few places. These coefficients are (presumably!)
+    // specific to my individual puzzle input.
     const A: [i64; 14] = [11, 13, 15, -8, 13, 15, -11, -4, -15, 14, 14, -1, -8, -14];
     const B: [i64; 14] = [6, 14, 14, 10, 9, 12, 8, 13, 12, 6, 9, 15, 4, 10];
 
@@ -71,6 +81,28 @@ fn checksum(digits: &[i64]) -> (i64, bool) {
     let mut shift_left = true;
 
     for i in 0..digits.len() {
+        // A few key observations here:
+        //
+        // 1. Unless the digit in a given slot matches a specific value (which may or may not be
+        // between 1 and 9), `shift_left` will be true and the checksum stored in register Z will
+        // increase.
+        // 2. By inspecting our input, we can see that there are a fixed number of cases where the
+        // checksum will get divided (shifted back to the right). Although controlled by a separate
+        // parameter, this always happens if A is negative. This is the ONLY way we can move the
+        // checksum in Z back toward zero.
+        // 3. Conveniently enough, based on our inputs, the negative values for A are also the ONLY
+        // opportunities we get to avoid the left shift mentioned in #1 above.
+        // 4. There are seven negative A coefficients, which means there are seven opportunities to
+        // avoid expanding the checksum in Z. That also means there are seven cases where we can't
+        // avoid expanding the checksum, and in turn THAT means that we need to hit every
+        // not-expanding opportunity to have a chance at getting the checksum back down to zero.
+        //
+        // That last observation is the basis for this whole strategy. We can work in blocks of
+        // digits to find cases where we're hitting that not-expanding opportunity. That means we
+        // can (for this specific set of inputs) iterate through all combinations of the first four
+        // digits (starting at 9999 and working down) and finding the relatively few cases where
+        // we hit the not-expanding opportunity on the last digit. If we find a group where that
+        // works, we can recursively explore the next block of digits in the same way.
         shift_left = (checksum % 26) + A[i] != digits[i];
         let shift_right = A[i] < 0;
 
